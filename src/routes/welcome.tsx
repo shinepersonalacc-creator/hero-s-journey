@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +14,7 @@ export const Route = createFileRoute("/welcome")({
 });
 
 function Welcome() {
+  const router = useRouter();
   const [state, setState] = useAppState();
   const [steps, setSteps] = useState(["", "", ""]);
   const [aims, setAims] = useState<string[]>([]);
@@ -98,7 +99,7 @@ function Welcome() {
 
   const goHome = () => {
     setState((current) => ({ ...current, goal: "" }));
-    window.location.href = "/";
+    router.navigate({ to: "/" });
   };
 
   const saveVision = () => {
@@ -167,7 +168,7 @@ function Welcome() {
         <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
           <button
             type="button"
-            onClick={() => (window.location.href = "/")}
+            onClick={() => router.navigate({ to: "/" })}
             className="inline-flex items-center justify-center rounded-full bg-black px-8 py-3 font-semibold text-white shadow-sm hover:bg-black/85"
           >
             Next

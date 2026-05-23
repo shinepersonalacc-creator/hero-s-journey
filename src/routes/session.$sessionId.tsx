@@ -47,18 +47,33 @@ function SessionPage() {
   };
 
   useEffect(() => {
-    refresh();
+  let active = true;
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      refresh();
-    });
+  const runRefresh = async () => {
+    if (!active) return;
 
-    return () => subscription.unsubscribe();
-    // Keep auth/session refresh tied to the active shared-session id.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
+    try {
+      await refresh();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  runRefresh();
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((event) => {
+    if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+      runRefresh();
+    }
+  });
+
+  return () => {
+    active = false;
+    subscription.unsubscribe();
+  };
+}, [sessionId])
 
   const signInWithGoogle = async () => {
     const { error: signInError } = await supabase.auth.signInWithOAuth({

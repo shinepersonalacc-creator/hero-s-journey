@@ -8,6 +8,7 @@ type Props = {
   sessionId: string;
   categories: Category[];
   localXP: number;
+  hostUserId?: string | null;
 };
 
 type SharedCategory = {
@@ -25,6 +26,7 @@ type SharedCategory = {
 
 type ParticipantPresence = {
   participantId: string;
+  userId?: string;
   name: string;
   category: SharedCategory | null;
   cameraOn: boolean;
@@ -32,13 +34,14 @@ type ParticipantPresence = {
   level: number;
   levelPercent: number;
   pointsToNextLevel: number;
+  position?: { x: number; y: number };
   joinedAt: number;
 };
 
 type SignalMessage = {
   from: string;
   to: string;
-  type: "offer" | "answer" | "ice" | "camera-off";
+  type: "offer" | "answer" | "ice" | "camera-off" | "kick";
   description?: RTCSessionDescriptionInit;
   candidate?: RTCIceCandidateInit;
 };
@@ -95,7 +98,7 @@ function summarizePresence(state: Record<string, ParticipantPresence[]>) {
   return Array.from(byId.values()).sort((a, b) => a.joinedAt - b.joinedAt);
 }
 
-export function SessionRoomBoard({ sessionId, categories, localXP }: Props) {
+export function SessionRoomBoard({ sessionId, categories, localXP, hostUserId }: Props) {
   const participantId = useMemo(getParticipantId, []);
   const joinedAtRef = useRef(Date.now());
   const localCameraNodeRef = useRef<HTMLDivElement>(null);
@@ -114,6 +117,9 @@ export function SessionRoomBoard({ sessionId, categories, localXP }: Props) {
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [displayName, setDisplayName] = useState("Session guest");
+  const [userId, setUserId] = useState<string | null>(null);
+  const [localCardPosition, setLocalCardPosition] = useState<{ x: number; y: number } | null>(null);
+
 
   const selectedCategory = useMemo(
     () =>
@@ -121,6 +127,7 @@ export function SessionRoomBoard({ sessionId, categories, localXP }: Props) {
     [categories, selectedCategoryId],
   );
   const localLevelInfo = useMemo(() => levelInfo(localXP), [localXP]);
+  const isHost = userId !== null && userId === hostUserId;
 
   useEffect(() => {
     if (selectedCategoryId || !categories[0]) return;
@@ -136,6 +143,7 @@ export function SessionRoomBoard({ sessionId, categories, localXP }: Props) {
         "Session guest";
 
       setDisplayName(userName);
+      setUserId(data.user?.id ?? null);
     });
   }, []);
 
@@ -147,9 +155,10 @@ export function SessionRoomBoard({ sessionId, categories, localXP }: Props) {
     });
   };
 
-  const trackPresence = (cameraOn = cameraActive) => {
+  const trackPresence = (cameraOn = cameraActive, position: { x: number; y: number } | null = localCardPosition) => {
     void channelRef.current?.track({
       participantId,
+      userId,
       name: displayName,
       category: toSharedCategory(selectedCategory),
       cameraOn,
@@ -157,7 +166,20 @@ export function SessionRoomBoard({ sessionId, categories, localXP }: Props) {
       level: localLevelInfo.level,
       levelPercent: localLevelInfo.percent,
       pointsToNextLevel: localLevelInfo.pointsToNextLevel ?? 0,
+      position: position ?? { x: 0, y: 0 },
       joinedAt: joinedAtRef.current,
+    });
+  };
+
+  const kickParticipant = (targetParticipantId: string) => {
+    void channelRef.current?.send({
+      type: "broadcast",
+      event: "signal",
+      payload: {
+        from: participantId,
+        to: targetParticipantId,
+        type: "kick",
+      },
     });
   };
 
@@ -323,6 +345,12 @@ export function SessionRoomBoard({ sessionId, categories, localXP }: Props) {
         await peer.addIceCandidate(new RTCIceCandidate(message.candidate));
       } catch (error) {
         if (!context.ignoreOffer) throw error;
+      }
+    }
+
+    if (message.type === "kick" && message.to === participantId) {
+      if (typeof window !== "undefined") {
+        window.location.href = "/";
       }
     }
   };
@@ -507,7 +535,14 @@ export function SessionRoomBoard({ sessionId, categories, localXP }: Props) {
             key={participant.participantId}
             participant={participant}
             canDrag={participant.participantId === participantId}
+            position={participant.participantId === participantId ? localCardPosition ?? participant.position : participant.position}
             defaultPosition={{ x: (index % 2) * 300, y: Math.floor(index / 2) * 210 }}
+            onDragStop={participant.participantId === participantId ? (position) => {
+              setLocalCardPosition(position);
+              trackPresence(cameraActive, position);
+            } : undefined}
+            isHost={isHost}
+            onRemove={participant.participantId !== participantId ? kickParticipant : undefined}
           />
         ))}
       </div>
@@ -562,28 +597,43 @@ function ParticipantCategoryCard({
   participant,
   canDrag,
   defaultPosition,
+  position,
+  onDragStop,
+  isHost,
+  onRemove,
 }: {
   participant: ParticipantPresence;
   canDrag: boolean;
   defaultPosition: { x: number; y: number };
+  position?: { x: number; y: number } | null;
+  onDragStop?: (position: { x: number; y: number }) => void;
+  isHost: boolean;
+  onRemove?: (participantId: string) => void;
 }) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const category = participant.category;
 
   if (!category) return null;
 
+  const currentPosition = position ?? defaultPosition;
   const card = (
     <div
       ref={nodeRef}
       className={`absolute left-0 top-0 w-[320px] rounded-2xl border-2 border-black bg-white p-4 text-black shadow-xl ${
         canDrag ? "cursor-grab active:cursor-grabbing" : ""
       }`}
-      style={
-        !canDrag
-          ? { transform: `translate(${defaultPosition.x}px, ${defaultPosition.y}px)` }
-          : undefined
-      }
+      style={!canDrag ? { transform: `translate(${currentPosition.x}px, ${currentPosition.y}px)` } : undefined}
     >
+      {isHost && onRemove && (
+        <button
+          type="button"
+          onClick={() => onRemove(participant.participantId)}
+          className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-black bg-red-500 text-white hover:bg-red-600"
+          aria-label={`Remove ${participant.name}`}
+        >
+          <X className="size-4" />
+        </button>
+      )}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="truncate text-2xl font-black text-black">
@@ -658,7 +708,13 @@ function ParticipantCategoryCard({
   if (!canDrag) return card;
 
   return (
-    <Draggable nodeRef={nodeRef} defaultPosition={defaultPosition} cancel="button,a">
+    <Draggable
+      nodeRef={nodeRef}
+      defaultPosition={defaultPosition}
+      position={position ?? undefined}
+      onStop={(_, data) => onDragStop?.({ x: data.x, y: data.y })}
+      cancel="button,a"
+    >
       {card}
     </Draggable>
   );

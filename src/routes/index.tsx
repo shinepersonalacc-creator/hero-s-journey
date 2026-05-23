@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAppState } from "@/lib/storage";
 import { getDisplayNameFromMetadata, loadUserXP } from "@/lib/profile";
@@ -30,6 +30,7 @@ function Index() {
   const [signedIn, setSignedIn] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [checkingProfile, setCheckingProfile] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     if (!hydrated) return;
@@ -53,11 +54,16 @@ function Index() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSignedIn(Boolean(session));
-      setDisplayName(session ? getDisplayNameFromMetadata(session.user.user_metadata) : "");
-      syncCloudXP();
-    });
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+  setSignedIn(Boolean(session));
+  setDisplayName(
+    session ? getDisplayNameFromMetadata(session.user.user_metadata) : ""
+  );
+
+  if (event === "SIGNED_IN") {
+    await syncCloudXP();
+  }
+});
 
     return () => {
       cancelled = true;
@@ -80,13 +86,12 @@ function Index() {
         }}
         onSave={(goal) => {
           setState((s) => ({ ...s, goal, draftGoal: goal }));
-          // navigate to the welcome page
-          window.location.href = "/welcome";
+          router.navigate({ to: "/welcome" });
         }}
         onContinue={(goal) => {
           const nextGoal = goal || state.draftGoal || "Hero's Journey";
           setState((s) => ({ ...s, goal: nextGoal, draftGoal: nextGoal }));
-          window.location.href = "/";
+          router.navigate({ to: "/" });
         }}
       />
     );

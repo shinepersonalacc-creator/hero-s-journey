@@ -20,6 +20,7 @@ import {
   Video,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "@tanstack/react-router";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
 
@@ -30,6 +31,7 @@ type Props = {
 };
 
 export function Dashboard({ state, setState, displayName = "" }: Props) {
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(state.goal);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
@@ -130,7 +132,7 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
 
     try {
       const session = await createSharedSession(sessionName);
-      window.location.href = `/session/${session.id}`;
+      router.navigate({ to: "/session/$sessionId", params: { sessionId: session.id } });
     } catch (error) {
       setSessionError(getErrorMessage(error, "Could not create session."));
       setCreatingSession(false);
@@ -149,14 +151,14 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
       const sessionId = url.pathname.split("/session/")[1]?.split("/")[0];
 
       if (sessionId) {
-        window.location.href = `/session/${sessionId}`;
+        router.navigate({ to: "/session/$sessionId", params: { sessionId } });
         return;
       }
     } catch {
       // Plain session IDs are valid too.
     }
 
-    window.location.href = `/session/${encodeURIComponent(value)}`;
+    router.navigate({ to: "/session/$sessionId", params: { sessionId: encodeURIComponent(value) } });
   };
 
   const onComplete = (delta: number) =>
