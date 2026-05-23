@@ -22,6 +22,7 @@ function SessionPage() {
   const [signedIn, setSignedIn] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const postSignInStorageKey = "ascend.postSignInSessionId";
   const shareLink = useMemo(() => {
     if (typeof window === "undefined") return sessionId;
 
@@ -76,10 +77,14 @@ function SessionPage() {
 }, [sessionId])
 
   const signInWithGoogle = async () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(postSignInStorageKey, sessionId);
+    }
+
     const { error: signInError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: shareLink,
+        redirectTo: `${window.location.origin}/welcome`,
       },
     });
 

@@ -24,6 +24,7 @@ function Welcome() {
   const [displayName, setDisplayName] = useState("");
   const [showAimScreen, setShowAimScreen] = useState(false);
   const [showChapterIntro, setShowChapterIntro] = useState(false);
+  const postSignInStorageKey = "ascend.postSignInSessionId";
 
   useEffect(() => {
     if (!editingVision) setDraftVision(state.goal);
@@ -32,6 +33,16 @@ function Welcome() {
   useEffect(() => {
     loadPreferredDisplayName().then(setDisplayName);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const redirectSessionId = window.localStorage.getItem(postSignInStorageKey);
+    if (!redirectSessionId) return;
+
+    window.localStorage.removeItem(postSignInStorageKey);
+    router.navigate({ to: "/session/$sessionId", params: { sessionId: redirectSessionId } });
+  }, [router]);
 
   const updateStep = (index: number, value: string) => {
     setSteps((current) => current.map((step, i) => (i === index ? value : step)));
