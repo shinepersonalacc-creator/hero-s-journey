@@ -1,9 +1,5 @@
 {
-<<<<<<< HEAD
   "name": "heros-journey",
-=======
-  "name": "tanstack_start_ts",
->>>>>>> 334d033222ab1dd3b69680318312cb46c9ce9dfa
   "private": true,
   "sideEffects": false,
   "type": "module",
