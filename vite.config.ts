@@ -20,7 +20,8 @@ if (isVercelBuild) {
 export default defineConfig({
   cloudflare: isVercelBuild ? false : undefined,
   plugins,
-  tanstackStart: {
-    server: { entry: "server" },
-  },
+tanstackStart: {
+  server: { entry: "server" },
+  router: { entry: "router" },
+},
 });
