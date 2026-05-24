@@ -3,8 +3,19 @@ import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppState, uid } from "@/lib/storage";
-import { loadPreferredDisplayName } from "@/lib/profile";
+import { DisplayNamePrompt } from "@/components/DisplayNamePrompt";
+import { ensureUserProfile, getDisplayNameFromMetadata, markOnboardingComplete } from "@/lib/profile";
+import { LogoutButton } from "@/components/LogoutButton";
+import { supabase } from "@/lib/supabase";
+import {
+  getChapterBackgroundImage,
+  getChapterBackgroundRepeat,
+  getChapterBackgroundSize,
+  getChapterInfo,
+} from "@/lib/chapters";
 import { Check, Home, Pencil } from "lucide-react";
+
+const DEFAULT_GOAL_PROMPT = "Where do you see yourself in the end of this journey";
 
 export const Route = createFileRoute("/welcome")({
   head: () => ({
@@ -20,18 +31,56 @@ function Welcome() {
   const [aims, setAims] = useState<string[]>([]);
   const [createdCategoryIds, setCreatedCategoryIds] = useState<string[]>([]);
   const [editingVision, setEditingVision] = useState(false);
-  const [draftVision, setDraftVision] = useState(state.goal);
+  const [draftVision, setDraftVision] = useState(state.draftGoal || state.goal);
   const [displayName, setDisplayName] = useState("");
+  const [profile, setProfile] = useState<{ gender?: string | null } | null>(null);
+  const [signedIn, setSignedIn] = useState(false);
+  const [checkingProfile, setCheckingProfile] = useState(true);
   const [showAimScreen, setShowAimScreen] = useState(false);
   const [showChapterIntro, setShowChapterIntro] = useState(false);
   const postSignInStorageKey = "ascend.postSignInSessionId";
+  const firstChapter = getChapterInfo(1);
+  const displayedGoal =
+    state.goal.trim() && state.goal !== "Hero's Journey" ? state.goal : DEFAULT_GOAL_PROMPT;
 
   useEffect(() => {
-    if (!editingVision) setDraftVision(state.goal);
-  }, [editingVision, state.goal]);
+    if (!editingVision) setDraftVision(state.draftGoal || state.goal);
+  }, [editingVision, state.draftGoal, state.goal]);
 
   useEffect(() => {
-    loadPreferredDisplayName().then(setDisplayName);
+    const syncProfile = async () => {
+      setCheckingProfile(true);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.user) {
+        setSignedIn(false);
+        setProfile(null);
+        setDisplayName("");
+        setCheckingProfile(false);
+        return;
+      }
+
+      setSignedIn(true);
+      setDisplayName(getDisplayNameFromMetadata(session.user.user_metadata));
+      const profile = await ensureUserProfile();
+      setProfile(profile);
+      setCheckingProfile(false);
+    };
+
+    syncProfile();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      syncProfile();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -43,6 +92,21 @@ function Welcome() {
     window.localStorage.removeItem(postSignInStorageKey);
     router.navigate({ to: "/session/$sessionId", params: { sessionId: redirectSessionId } });
   }, [router]);
+
+  if (checkingProfile) {
+    return <div className="min-h-screen" />;
+  }
+
+  if (signedIn && (!displayName || !profile?.gender)) {
+    return (
+      <DisplayNamePrompt
+        onComplete={(savedDisplayName, gender) => {
+          setDisplayName(savedDisplayName);
+          setProfile((current) => ({ ...(current ?? {}), gender }));
+        }}
+      />
+    );
+  }
 
   const updateStep = (index: number, value: string) => {
     setSteps((current) => current.map((step, i) => (i === index ? value : step)));
@@ -78,6 +142,7 @@ function Welcome() {
     setState((current) => ({
       ...current,
       categories: [...current.categories, ...newCategories],
+      hasStartedJourney: true,
     }));
 
     setCreatedCategoryIds(newCategories.map((category) => category.id));
@@ -91,7 +156,7 @@ function Welcome() {
     setShowAimScreen(true);
   };
 
-  const continueToChapterIntro = () => {
+  const continueToChapterIntro = async () => {
     setState((current) => ({
       ...current,
       categories: current.categories.map((category) => {
@@ -104,7 +169,10 @@ function Welcome() {
           aim: aims[index]?.trim() ?? "",
         };
       }),
+      hasStartedJourney: true,
     }));
+
+    await markOnboardingComplete();
     setShowChapterIntro(true);
   };
 
@@ -123,64 +191,75 @@ function Welcome() {
       <div
         className="flex min-h-screen flex-col items-center justify-center px-6 py-16 text-center text-white"
         style={{
-          backgroundImage: "url('/Image/lvl1.png')",
-          backgroundSize: "auto 100vh",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-          backgroundAttachment: "fixed",
+          backgroundImage: getChapterBackgroundImage(1),
+          backgroundSize: getChapterBackgroundSize(),
+          backgroundPosition: "top center",
+          backgroundRepeat: getChapterBackgroundRepeat(),
+          backgroundAttachment: "scroll",
         }}
       >
-        <button
-          type="button"
-          onClick={goHome}
-          className="fixed right-5 top-5 inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/40 text-black opacity-70 shadow-sm backdrop-blur-sm transition hover:bg-white/60 hover:opacity-100"
-          aria-label="Home"
-        >
-          <Home className="size-5" />
-        </button>
+        <div className="fixed right-5 top-5 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={goHome}
+            className="inline-flex h-12 w-12 items-center justify-center rounded-full border-2 border-black bg-white text-black shadow-sm transition hover:bg-black/5"
+            aria-label="Home"
+          >
+            <Home className="size-5" />
+          </button>
+          <LogoutButton />
+        </div>
 
         <div
           className="rounded-3xl bg-[#6f4a2f] px-8 py-5 text-4xl font-bold text-white shadow-sm md:text-6xl"
           style={{ fontFamily: '"Caudex", serif' }}
         >
-          Chapter I : Ordinary World
+          {firstChapter.label}
         </div>
 
-        <div className="mt-8 w-full max-w-3xl rounded-3xl border-2 border-black bg-white p-5 text-black shadow-xl">
-          {displayName && <div className="text-3xl font-black">Hi, {displayName}</div>}
-          <div className="mt-3 flex items-start gap-3 text-left">
-            {editingVision ? (
-              <Textarea
-                value={draftVision}
-                onChange={(event) => setDraftVision(event.target.value)}
-                rows={4}
-                className="min-h-28 flex-1 resize-none rounded-xl border-2 border-black bg-white text-base font-bold text-black"
-                style={{ fontFamily: '"Roboto Mono", monospace' }}
-              />
-            ) : (
-              <div
-                className="min-w-0 flex-1 text-base font-bold leading-relaxed md:text-lg"
-                style={{ fontFamily: '"Roboto Mono", monospace' }}
-              >
-                {state.goal}
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={editingVision ? saveVision : () => setEditingVision(true)}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/10 text-black hover:bg-black/20"
-              aria-label={editingVision ? "Save vision" : "Edit vision"}
-            >
-              {editingVision ? <Check className="size-4" /> : <Pencil className="size-4" />}
-            </button>
-          </div>
+        <div
+          className="mt-5 w-full max-w-3xl rounded-3xl border-2 border-black bg-white p-5 text-left text-base font-bold leading-relaxed text-black shadow-xl md:text-lg"
+          style={{ fontFamily: '"Roboto Mono", monospace' }}
+        >
+          {firstChapter.description}
         </div>
+
+        {(state.goal || displayedGoal) && (
+          <div className="mt-8 w-full max-w-3xl rounded-3xl border-2 border-black bg-white p-5 text-black shadow-xl">
+            <div className="mt-3 flex items-start gap-3 text-left">
+              {editingVision ? (
+                <Textarea
+                  value={draftVision || displayedGoal}
+                  onChange={(event) => setDraftVision(event.target.value)}
+                  rows={4}
+                  className="min-h-28 flex-1 resize-none rounded-xl border-2 border-black bg-white text-base font-bold text-black"
+                  style={{ fontFamily: '"Roboto Mono", monospace' }}
+                />
+              ) : (
+                <div
+                  className="min-w-0 flex-1 text-base font-bold leading-relaxed md:text-lg"
+                  style={{ fontFamily: '"Roboto Mono", monospace' }}
+                >
+                  {displayedGoal}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={editingVision ? saveVision : () => setEditingVision(true)}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/10 text-black hover:bg-black/20"
+                aria-label={editingVision ? "Save vision" : "Edit vision"}
+              >
+                {editingVision ? <Check className="size-4" /> : <Pencil className="size-4" />}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
           <button
             type="button"
             onClick={() => router.navigate({ to: "/" })}
-            className="inline-flex items-center justify-center rounded-full bg-black px-8 py-3 font-semibold text-white shadow-sm hover:bg-black/85"
+            className="inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-8 py-3 font-bold text-black shadow-sm hover:bg-black/5"
           >
             Next
           </button>
@@ -205,14 +284,17 @@ function Welcome() {
           backgroundAttachment: "fixed",
         }}
       >
-        <button
-          type="button"
-          onClick={goHome}
-          className="fixed right-5 top-5 inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/40 text-black opacity-70 shadow-sm backdrop-blur-sm transition hover:bg-white/60 hover:opacity-100"
-          aria-label="Home"
-        >
-          <Home className="size-5" />
-        </button>
+        <div className="fixed right-5 top-5 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={goHome}
+            className="inline-flex h-12 w-12 items-center justify-center rounded-full border-2 border-black bg-white text-black shadow-sm transition hover:bg-black/5"
+            aria-label="Home"
+          >
+            <Home className="size-5" />
+          </button>
+          <LogoutButton />
+        </div>
 
         <div className="mx-auto flex min-h-[calc(100vh-8rem)] max-w-6xl flex-col justify-center">
           <div
@@ -257,7 +339,7 @@ function Welcome() {
             <button
               type="button"
               onClick={continueToChapterIntro}
-              className="inline-flex items-center justify-center rounded-full bg-gradient-to-br from-[#e5de00] to-[#d4b500] px-8 py-3 font-semibold text-white shadow-sm hover:opacity-95"
+              className="inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-8 py-3 font-bold text-black shadow-sm hover:bg-black/5"
             >
               Continue
             </button>
@@ -269,14 +351,17 @@ function Welcome() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center px-6 py-16">
-      <button
-        type="button"
-        onClick={goHome}
-        className="fixed right-5 top-5 inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/40 text-black opacity-70 shadow-sm backdrop-blur-sm transition hover:bg-white/60 hover:opacity-100"
-        aria-label="Home"
-      >
-        <Home className="size-5" />
-      </button>
+      <div className="fixed right-5 top-5 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={goHome}
+            className="inline-flex h-12 w-12 items-center justify-center rounded-full border-2 border-black bg-white text-black shadow-sm transition hover:bg-black/5"
+            aria-label="Home"
+        >
+          <Home className="size-5" />
+        </button>
+        <LogoutButton />
+      </div>
 
       <div className="mb-10 rounded-xl border border-white/20 bg-white/10 p-6 text-white shadow-sm">
         {state.goal && (
@@ -341,7 +426,7 @@ function Welcome() {
         <button
           type="button"
           onClick={continueToAimScreen}
-          className="inline-flex items-center justify-center rounded-full bg-gradient-to-br from-[#e5de00] to-[#d4b500] px-6 py-3 font-semibold text-white shadow-sm hover:opacity-95"
+          className="inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-6 py-3 font-bold text-black shadow-sm hover:bg-black/5"
         >
           Continue
         </button>

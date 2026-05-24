@@ -1,11 +1,18 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAppState } from "@/lib/storage";
-import { getDisplayNameFromMetadata, loadUserXP } from "@/lib/profile";
+import {
+  getDisplayNameFromMetadata,
+  hasCompletedOnboardingFromMetadata,
+  loadUserProfile,
+  loadUserXP,
+} from "@/lib/profile";
 import { supabase } from "@/lib/supabase";
 import { GoalSetup } from "@/components/GoalSetup";
 import { Dashboard } from "@/components/Dashboard";
 import { DisplayNamePrompt } from "@/components/DisplayNamePrompt";
+
+const DEFAULT_GOAL_PROMPT = "Where do you see yourself in the end of this journey";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,6 +36,8 @@ function Index() {
   const [state, setState, hydrated] = useAppState();
   const [signedIn, setSignedIn] = useState(false);
   const [displayName, setDisplayName] = useState("");
+  const [profile, setProfile] = useState<{ gender?: string | null } | null>(null);
+  const [cloudOnboardingComplete, setCloudOnboardingComplete] = useState(false);
   const [checkingProfile, setCheckingProfile] = useState(true);
   const router = useRouter();
 
@@ -39,15 +48,20 @@ function Index() {
 
     const syncCloudXP = async () => {
       const { data } = await supabase.auth.getUser();
-      const profile = data.user ? await loadUserXP() : null;
+      const profile = data.user ? await loadUserProfile() : null;
+      const cloudXP = data.user ? await loadUserXP() : null;
 
       if (cancelled) return;
 
       setSignedIn(Boolean(data.user));
       setDisplayName(data.user ? getDisplayNameFromMetadata(data.user.user_metadata) : "");
+      setCloudOnboardingComplete(
+        data.user ? hasCompletedOnboardingFromMetadata(data.user.user_metadata) : false,
+      );
+      setProfile(profile);
       setCheckingProfile(false);
 
-      if (profile) setState((current) => ({ ...current, totalPoints: profile.xp }));
+      if (cloudXP) setState((current) => ({ ...current, totalPoints: cloudXP.xp }));
     };
 
     syncCloudXP();
@@ -55,15 +69,18 @@ function Index() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-  setSignedIn(Boolean(session));
-  setDisplayName(
-    session ? getDisplayNameFromMetadata(session.user.user_metadata) : ""
-  );
+      setSignedIn(Boolean(session));
+      setDisplayName(
+        session ? getDisplayNameFromMetadata(session.user.user_metadata) : ""
+      );
+      setCloudOnboardingComplete(
+        session ? hasCompletedOnboardingFromMetadata(session.user.user_metadata) : false,
+      );
 
-  if (event === "SIGNED_IN") {
-    await syncCloudXP();
-  }
-});
+      if (event === "SIGNED_IN") {
+        await syncCloudXP();
+      }
+    });
 
     return () => {
       cancelled = true;
@@ -71,27 +88,62 @@ function Index() {
     };
   }, [hydrated, setState]);
 
+  const hasStartedJourney =
+    cloudOnboardingComplete ||
+    Boolean(state.hasStartedJourney || state.goal || state.draftGoal || state.categories.length);
+
+  const shouldResumeDashboard =
+    signedIn && !checkingProfile && cloudOnboardingComplete && !state.goal;
+
+  useEffect(() => {
+    if (!shouldResumeDashboard) return;
+
+    const nextGoal = state.draftGoal || DEFAULT_GOAL_PROMPT;
+    setState((current) => ({
+      ...current,
+      goal: nextGoal,
+      draftGoal: nextGoal,
+      hasStartedJourney: true,
+    }));
+  }, [setState, shouldResumeDashboard, state.draftGoal]);
+
   if (!hydrated) return <div className="min-h-screen" />;
 
-  if (signedIn && !checkingProfile && !displayName) {
-    return <DisplayNamePrompt onComplete={setDisplayName} />;
+  if (signedIn && !checkingProfile && (!displayName || !profile?.gender)) {
+    return (
+      <DisplayNamePrompt
+        onComplete={(displayName, gender) => {
+          setDisplayName(displayName);
+          setProfile((current) => ({ ...current, gender }));
+        }}
+      />
+    );
   }
+
+  if (shouldResumeDashboard) return <div className="min-h-screen" />;
 
   if (!state.goal) {
     return (
       <GoalSetup
         initialGoal={state.draftGoal || state.goal}
+        hasStartedJourney={hasStartedJourney}
         onDraftChange={(goal) => {
           setState((s) => ({ ...s, draftGoal: goal }));
         }}
         onSave={(goal) => {
-          setState((s) => ({ ...s, goal, draftGoal: goal }));
+          setState((s) => ({ ...s, draftGoal: goal, hasStartedJourney: true }));
           router.navigate({ to: "/welcome" });
         }}
         onContinue={(goal) => {
-          const nextGoal = goal || state.draftGoal || "Hero's Journey";
-          setState((s) => ({ ...s, goal: nextGoal, draftGoal: nextGoal }));
-          router.navigate({ to: "/" });
+          if (hasStartedJourney) {
+            const nextGoal = state.draftGoal || goal || DEFAULT_GOAL_PROMPT;
+            setState((s) => ({ ...s, goal: nextGoal, draftGoal: nextGoal }));
+            router.navigate({ to: "/" });
+            return;
+          }
+
+          setState((s) => ({ ...s, draftGoal: goal || s.draftGoal, hasStartedJourney: true }));
+          router.navigate({ to: "/welcome" });
         }}
       />
     );

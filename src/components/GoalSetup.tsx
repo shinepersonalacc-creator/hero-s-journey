@@ -1,46 +1,63 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
-import { ensureUserProfile, getDisplayNameFromMetadata } from "@/lib/profile";
+import {
+  ensureUserProfile,
+  getDisplayNameFromMetadata,
+  loadUserProfile,
+} from "@/lib/profile";
+import { getSiteUrl } from "@/lib/site";
 import { DisplayNamePrompt } from "@/components/DisplayNamePrompt";
+import { LogoutButton } from "@/components/LogoutButton";
+
+const DISCORD_URL = "https://discord.gg/cyqGzSPf";
 
 export function GoalSetup({
   initialGoal = "",
+  hasStartedJourney = false,
   onDraftChange,
   onSave,
   onContinue,
 }: {
   initialGoal?: string;
+  hasStartedJourney?: boolean;
   onDraftChange?: (goal: string) => void;
   onSave: (goal: string) => void;
   onContinue: (goal?: string) => void;
 }) {
   const [val, setVal] = useState(initialGoal);
   const [googleSignedIn, setGoogleSignedIn] = useState(false);
-  const [needsDisplayName, setNeedsDisplayName] = useState(false);
+  const [needsProfile, setNeedsProfile] = useState(false);
   const [signInError, setSignInError] = useState("");
 
   useEffect(() => {
     let mounted = true;
 
     supabase.auth.getSession().then(async ({ data }) => {
-      if (data.session) await ensureUserProfile();
-      if (mounted) {
-        setGoogleSignedIn(Boolean(data.session));
-        setNeedsDisplayName(
-          Boolean(data.session && !getDisplayNameFromMetadata(data.session.user.user_metadata)),
-        );
+      if (data.session) {
+        const profile = await ensureUserProfile();
+        const displayName = getDisplayNameFromMetadata(data.session.user.user_metadata);
+        if (mounted) {
+          setGoogleSignedIn(true);
+          setNeedsProfile(!displayName || !profile?.gender);
+        }
+      } else if (mounted) {
+        setGoogleSignedIn(false);
+        setNeedsProfile(false);
       }
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) void ensureUserProfile();
-      setGoogleSignedIn(Boolean(session));
-      setNeedsDisplayName(
-        Boolean(session && !getDisplayNameFromMetadata(session.user.user_metadata)),
-      );
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session) {
+        const profile = await loadUserProfile();
+        setGoogleSignedIn(true);
+        setNeedsProfile(!getDisplayNameFromMetadata(session.user.user_metadata) || !profile?.gender);
+      } else {
+        setGoogleSignedIn(false);
+        setNeedsProfile(false);
+      }
     });
 
     return () => {
@@ -55,16 +72,15 @@ export function GoalSetup({
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-            redirectTo: "https://hero-s-journey-liard.vercel.app/welcome"
-,
+        redirectTo: `${getSiteUrl()}/`,
       },
     });
 
     if (error) setSignInError(error.message);
   };
 
-  if (googleSignedIn && needsDisplayName) {
-    return <DisplayNamePrompt onComplete={() => setNeedsDisplayName(false)} />;
+  if (googleSignedIn && needsProfile) {
+    return <DisplayNamePrompt onComplete={() => setNeedsProfile(false)} />;
   }
 
   return (
@@ -77,12 +93,16 @@ export function GoalSetup({
       }}
     >
       <div className="mx-auto flex min-h-dvh max-w-2xl flex-col justify-center px-6 py-10 md:py-16">
+        {googleSignedIn && (
+          <div className="mb-6 flex justify-end">
+            <LogoutButton />
+          </div>
+        )}
         <h1
           className="mt-4 text-center font-display text-7xl font-bold leading-tight md:text-8xl"
           style={{
             fontFamily: "UntoldStory",
             WebkitTextStroke: "2px black",
-            textStroke: "2px black",
           }}
         >
           <span className="text-outline-black">Hero's Journey</span>
@@ -106,71 +126,54 @@ export function GoalSetup({
           </div>
         )}
 
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+          <a
+            href={DISCORD_URL}
+            className="inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-6 py-3 text-base font-bold text-black shadow-sm transition hover:bg-black/5"
+          >
+            Join our Discord
+          </a>
+        </div>
+
+        <div className="mt-6 overflow-hidden rounded-3xl border-2 border-black bg-white p-3 shadow-xl">
+          <img
+            src="/Image/about-curator.png"
+            alt="About the curator"
+            className="h-auto w-full rounded-2xl"
+          />
+        </div>
+
         {googleSignedIn && (
           <>
-            <div className="mt-6 rounded-3xl bg-black p-4 shadow-xl">
-              <p
-                className="text-lg font-normal text-white md:text-xl"
-                style={{ fontFamily: "UntoldStory" }}
-              >
-                Close your eyes. Picture the person you&apos;re working towards.....
-              </p>
-            </div>
-
-            <div
-              className="mt-4 w-full"
-              style={{
-                display: "block",
-                width: "100%",
-                minHeight: "300px",
-                padding: "0",
-                backgroundColor: "white",
-                border: "5px solid black",
-                borderRadius: "28px",
-                boxShadow: "0 18px 35px rgba(0,0,0,0.35)",
-              }}
-            >
-              <textarea
-                id="hero-vision"
-                value={val}
-                onChange={(e) => {
-                  setVal(e.target.value);
-                  onDraftChange?.(e.target.value);
-                }}
-                placeholder={`I want to build something that outlives me - work that genuinely improves people's lives.
-Every challenge feels like a step toward becoming stronger, wiser, and more capable.
-Success, to me, isn't just achievement; it's having the freedom to create, explore, and keep growing.
-No matter how long it takes, I refuse to settle for an ordinary life.`}
-                rows={8}
-                aria-label="Describe the person you are working toward"
-                style={{
-                  display: "block",
-                  width: "100%",
-                  minHeight: "300px",
-                  resize: "none",
-                  overflowY: "auto",
-                  padding: "22px",
-                  backgroundColor: "white",
-                  color: "black",
-                  border: "0",
-                  borderRadius: "23px",
-                  fontFamily: '"Roboto Mono", monospace',
-                  fontSize: "18px",
-                  fontWeight: 700,
-                  lineHeight: 1.5,
-                  outline: "none",
-                }}
-              />
-            </div>
+            {hasStartedJourney ? (
+              <div className="mt-6 rounded-3xl bg-black p-4 text-center shadow-xl">
+                <p
+                  className="text-lg font-normal text-white md:text-xl"
+                  style={{ fontFamily: "UntoldStory" }}
+                >
+                  Your journey has already begun. Continue from where you left off.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-6 rounded-3xl bg-black p-4 shadow-xl">
+                <p
+                  className="text-lg font-normal text-white md:text-xl"
+                  style={{ fontFamily: "UntoldStory" }}
+                >
+                  You need to make your first step: break your progress into goals that will help
+                  you reach the person you are becoming.
+                </p>
+              </div>
+            )}
 
             <div className="mt-6 flex flex-col items-center gap-3">
               <span className="text-xs text-white">Stored locally on this device</span>
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <Button
                   size="lg"
-                  disabled={val.trim().length < 4}
+                  disabled={hasStartedJourney}
                   onClick={() => onSave(val.trim())}
-                  className="rounded-full border-2 border-black bg-gradient-to-br from-[#e5de00] to-[#d4b500] px-12 py-4 text-lg font-semibold text-black shadow-sm hover:opacity-95"
+                  className="rounded-full border-2 border-black bg-gradient-to-br from-[#e5de00] to-[#d4b500] px-12 py-4 text-lg font-semibold text-black shadow-sm hover:opacity-95 disabled:opacity-50"
                 >
                   Begin
                 </Button>

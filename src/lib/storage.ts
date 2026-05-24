@@ -25,11 +25,18 @@ export type AppState = {
   categories: Category[];
   totalPoints: number;
   showBeginMessage?: boolean;
+  hasStartedJourney?: boolean;
 };
 
 const KEY = "ascend.app.v1";
 
-const empty: AppState = { goal: "", categories: [], totalPoints: 0, showBeginMessage: false };
+const empty: AppState = {
+  goal: "",
+  categories: [],
+  totalPoints: 0,
+  showBeginMessage: false,
+  hasStartedJourney: false,
+};
 
 export function loadState(): AppState {
   if (typeof window === "undefined") return empty;

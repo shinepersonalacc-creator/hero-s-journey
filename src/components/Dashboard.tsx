@@ -1,6 +1,13 @@
 import { AppState, Category, levelInfo, todayKey, uid } from "@/lib/storage";
 import { saveUserXP } from "@/lib/profile";
 import { createSharedSession } from "@/lib/sessions";
+import {
+  getChapterBackgroundImage,
+  getChapterBackgroundRepeat,
+  getChapterBackgroundSize,
+  getChapterInfo,
+} from "@/lib/chapters";
+import { LogoutButton } from "@/components/LogoutButton";
 import { ProgressRing } from "./ProgressRing";
 import { CategoryCard } from "./CategoryCard";
 import { AddCategoryDialog } from "./AddCategoryDialog";
@@ -9,6 +16,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Calendar,
+  Check,
   Eye,
   Home,
   Link,
@@ -18,11 +26,15 @@ import {
   Trophy,
   Users,
   Video,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
+
+const DEFAULT_GOAL_PROMPT = "Where do you see yourself in the end of this journey";
+const DISCORD_URL = "https://discord.gg/cyqGzSPf";
 
 type Props = {
   state: AppState;
@@ -44,7 +56,8 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
   const [creatingSession, setCreatingSession] = useState(false);
   const [chapterIntroLevel, setChapterIntroLevel] = useState<number | null>(null);
   const [levelUpLevel, setLevelUpLevel] = useState<number | null>(null);
-  const chapterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [curatorOpen, setCuratorOpen] = useState(false);
+  const chapterTimer = useRef<number | null>(null);
 
   const today = todayKey();
   const allTasks = state.categories.flatMap((c) => c.tasks);
@@ -53,17 +66,20 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
 
   const { level, percent, neededXP, pointsToNextLevel } = levelInfo(state.totalPoints);
   const previousLevel = useRef(level);
-  const levelImage = getLevelImage(level);
+  const chapter = getChapterInfo(level);
+  const displayedGoal = state.goal.trim() && state.goal !== "Hero's Journey"
+    ? state.goal
+    : DEFAULT_GOAL_PROMPT;
   const stageBackground = {
-    backgroundImage: `url('${levelImage}')`,
-    backgroundSize: getLevelBackgroundSize(level),
-    backgroundPosition: "center",
-    backgroundRepeat: "no-repeat",
-    backgroundAttachment: "fixed",
+    backgroundImage: getChapterBackgroundImage(level),
+    backgroundSize: getChapterBackgroundSize(),
+    backgroundPosition: "top center",
+    backgroundRepeat: getChapterBackgroundRepeat(),
+    backgroundAttachment: "scroll",
   };
 
   useEffect(() => {
-    if (previousLevel.current !== level && (level === 2 || level === 3)) {
+    if (previousLevel.current !== level && level >= 2 && level <= 10) {
       setLevelUpLevel(level);
 
       if (chapterTimer.current) window.clearTimeout(chapterTimer.current);
@@ -178,8 +194,7 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
     return (
       <ChapterIntro
         level={chapterIntroLevel}
-        goal={state.goal}
-        displayName={displayName}
+        goal={displayedGoal}
         onGoalChange={(goal) => setState((s) => ({ ...s, goal, draftGoal: goal }))}
         onNext={() => setChapterIntroLevel(null)}
       />
@@ -188,31 +203,44 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
 
   return (
     <div
-      className={`relative h-screen overflow-hidden ${levelUpLevel ? "level-up-falling" : ""}`}
+      className={`relative min-h-screen overflow-y-auto ${levelUpLevel ? "level-up-falling" : ""}`}
       style={stageBackground}
     >
       <div className="mx-auto max-w-7xl px-6 py-10 md:py-14">
         <header className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
           <div className="level-fall-item flex-1" style={{ animationDelay: "0ms" }}>
-            {displayName && (
-              <div className="text-3xl font-black text-white md:text-5xl">Hi, {displayName}</div>
-            )}
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setCuratorOpen(true)}
+                className="inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-4 py-2 font-bold text-black shadow-sm transition hover:bg-black/5"
+              >
+                About the curator
+              </button>
+              <a
+                href={DISCORD_URL}
+                className="inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-4 py-2 font-bold text-black shadow-sm transition hover:bg-black/5"
+              >
+                Join our Discord
+              </a>
+              <LogoutButton />
+            </div>
 
-            <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs uppercase tracking-widest text-white backdrop-blur">
-              <Target className="size-3" /> Your dream
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-widest text-black shadow-sm">
+              <Target className="size-3" /> {chapter.label}
             </div>
 
             <div className="mt-4 flex gap-2">
               <button
                 onClick={goBack}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-black bg-white text-black shadow-sm transition hover:bg-black/5"
                 aria-label="Go back"
               >
                 <ArrowLeft className="size-4" />
               </button>
               <button
                 onClick={goForward}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-black bg-white text-black shadow-sm transition hover:bg-black/5"
                 aria-label="Go forward"
               >
                 <ArrowRight className="size-4" />
@@ -227,21 +255,21 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
               />
               <button
                 onClick={() => setVideoOpen(true)}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-black bg-white text-black shadow-sm transition hover:bg-black/5"
                 aria-label="Open camera"
               >
                 <Video className="size-4" />
               </button>
               <button
                 onClick={() => setSessionDialogOpen(true)}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-black bg-white text-black shadow-sm transition hover:bg-black/5"
                 aria-label="Create session"
               >
                 <Users className="size-4" />
               </button>
               <button
                 onClick={goHome}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-black bg-white text-black shadow-sm transition hover:bg-black/5"
                 aria-label="Go home"
               >
                 <Home className="size-4" />
@@ -250,7 +278,7 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
                 onAdd={addCategory}
                 trigger={
                   <button
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-black bg-white text-black shadow-sm transition hover:bg-black/5"
                     aria-label="Add category"
                   >
                     <Plus className="size-4" />
@@ -271,7 +299,7 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
                 <div className="mt-3 flex gap-2">
                   <Button
                     onClick={() => {
-                      const nextGoal = draft.trim() || state.goal;
+                      const nextGoal = draft.trim() || displayedGoal;
                       setState((s) => ({ ...s, goal: nextGoal, draftGoal: nextGoal }));
                       setEditing(false);
                     }}
@@ -293,14 +321,17 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
               </div>
             ) : (
               <button
-                onClick={() => setEditing(true)}
+                onClick={() => {
+                  setDraft(displayedGoal);
+                  setEditing(true);
+                }}
                 className="group mt-4 flex max-w-2xl items-start gap-3 rounded-2xl border-2 border-black bg-white p-5 text-left shadow-sm"
               >
                 <h1
                   className="text-base font-semibold leading-relaxed text-black md:text-lg"
                   style={{ fontFamily: '"Roboto Mono", monospace' }}
                 >
-                  {state.goal}
+                  {displayedGoal}
                 </h1>
                 <Pencil className="mt-1 size-5 shrink-0 text-black/60 opacity-0 transition group-hover:opacity-100" />
               </button>
@@ -381,6 +412,25 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
           </div>
         </section>
       </div>
+      {curatorOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8">
+          <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border-2 border-black bg-white p-3 shadow-2xl">
+            <button
+              type="button"
+              onClick={() => setCuratorOpen(false)}
+              className="absolute right-5 top-5 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-black bg-white text-black shadow-sm hover:bg-black/5"
+              aria-label="Close about the curator"
+            >
+              <X className="size-5" />
+            </button>
+            <img
+              src="/Image/about-curator.png"
+              alt="About the curator"
+              className="h-auto w-full rounded-2xl"
+            />
+          </div>
+        </div>
+      )}
       <VideoCallBox open={videoOpen} onOpenChange={setVideoOpen} />
       {sessionDialogOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4">
@@ -472,40 +522,20 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-function getLevelImage(level: number) {
-  if (level === 2) return "/Image/lvl2.png";
-  if (level === 3) return "/Image/lvl 3.png";
-  if (level === 1) return "/Image/lvl1.png";
-
-  return "/Image/adventurebg.png";
-}
-
-function getLevelBackgroundSize(level: number) {
-  return "auto 100vh";
-}
-
-function getChapterTitle(level: number) {
-  if (level === 2) return "Chapter 2 : Call to Adventure";
-  if (level === 3) return "Chapter 3 : Answering the Call";
-
-  return "";
-}
-
 function ChapterIntro({
   level,
   goal,
-  displayName,
   onGoalChange,
   onNext,
 }: {
   level: number;
   goal: string;
-  displayName?: string;
   onGoalChange: (goal: string) => void;
   onNext: () => void;
 }) {
   const [editingGoal, setEditingGoal] = useState(false);
   const [draftGoal, setDraftGoal] = useState(goal);
+  const chapter = getChapterInfo(level);
 
   const saveGoal = () => {
     const nextGoal = draftGoal.trim() || goal;
@@ -518,22 +548,28 @@ function ChapterIntro({
     <div
       className="flex min-h-screen flex-col items-center justify-center px-6 py-16 text-center text-white"
       style={{
-        backgroundImage: `url('${getLevelImage(level)}')`,
-        backgroundSize: getLevelBackgroundSize(level),
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-        backgroundAttachment: "fixed",
+        backgroundImage: getChapterBackgroundImage(level),
+        backgroundSize: getChapterBackgroundSize(),
+        backgroundPosition: "top center",
+        backgroundRepeat: getChapterBackgroundRepeat(),
+        backgroundAttachment: "scroll",
       }}
     >
       <div
         className="rounded-3xl bg-[#6f4a2f] px-8 py-5 text-4xl font-bold text-white shadow-sm md:text-6xl"
         style={{ fontFamily: '"Caudex", serif' }}
       >
-        {getChapterTitle(level)}
+        {chapter.label}
+      </div>
+
+      <div
+        className="mt-5 w-full max-w-3xl rounded-3xl border-2 border-black bg-white p-5 text-left text-base font-bold leading-relaxed text-black shadow-xl md:text-lg"
+        style={{ fontFamily: '"Roboto Mono", monospace' }}
+      >
+        {chapter.description}
       </div>
 
       <div className="mt-8 w-full max-w-3xl rounded-3xl border-2 border-black bg-white p-5 text-black shadow-xl">
-        {displayName && <div className="text-3xl font-black">Hi, {displayName}</div>}
         <div className="mt-3 flex items-start gap-3 text-left">
           {editingGoal ? (
             <Textarea
@@ -566,7 +602,7 @@ function ChapterIntro({
         <button
           type="button"
           onClick={onNext}
-          className="inline-flex items-center justify-center rounded-full bg-black px-8 py-3 font-semibold text-white shadow-sm hover:bg-black/85"
+          className="inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-8 py-3 font-bold text-black shadow-sm hover:bg-black/5"
         >
           Next
         </button>
@@ -594,7 +630,7 @@ function CategoryVisibilityPicker({
     <div className="relative">
       <button
         onClick={() => onOpenChange(!open)}
-        className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-black bg-white text-black shadow-sm transition hover:bg-black/5"
         aria-label="Choose visible categories"
       >
         <Eye className="size-4" />

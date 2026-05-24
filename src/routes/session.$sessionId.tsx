@@ -5,6 +5,7 @@ import { SessionRoomBoard } from "@/components/SessionRoomBoard";
 import { supabase } from "@/lib/supabase";
 import { useAppState } from "@/lib/storage";
 import { loadUserXP } from "@/lib/profile";
+import { getSiteUrl } from "@/lib/site";
 import { endSharedSession, loadSharedSession, type SharedSession } from "@/lib/sessions";
 
 export const Route = createFileRoute("/session/$sessionId")({
@@ -26,7 +27,7 @@ function SessionPage() {
   const shareLink = useMemo(() => {
     if (typeof window === "undefined") return sessionId;
 
-    return `${window.location.origin}/session/${sessionId}`;
+    return `${getSiteUrl()}/session/${sessionId}`;
   }, [sessionId]);
 
   const refresh = async () => {
@@ -84,7 +85,7 @@ function SessionPage() {
     const { error: signInError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/welcome`,
+        redirectTo: `${getSiteUrl()}/`,
       },
     });
 
