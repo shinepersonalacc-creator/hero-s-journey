@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Draggable from "react-draggable";
 import { ExternalLink, Video, VideoOff, X } from "lucide-react";
 import { Button } from "./ui/button";
+import sessionBackground from "../../images/Untitled design.png";
 
 type Props = {
   open: boolean;
@@ -122,12 +123,13 @@ export function VideoCallBox({ open, onOpenChange }: Props) {
           </div>
 
           <div className="grid grid-cols-[1fr_34px] grid-rows-[1fr_34px] bg-[#f6d8e6]">
-            <div className="relative aspect-video min-h-[220px] bg-black">
+            <div className="relative aspect-video min-h-[220px] bg-black" style={{ backgroundImage: `url(${sessionBackground})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
               <video
                 ref={videoRef}
                 muted
                 playsInline
                 className={`h-full w-full object-cover ${active ? "block" : "hidden"}`}
+                style={{ transform: "scaleX(-1)" }}
               />
 
               {!active && (

@@ -35,12 +35,17 @@ export function ProgressRing({ percent, size = 180, stroke = 19, label, sublabel
         />
       </svg>
       <div
-        className="absolute inset-0 flex flex-col items-center justify-center rounded-full text-black"
-        style={{ fontFamily: '"Roboto Mono", monospace' }}
+        className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full bg-white text-black"
+        style={{
+          width: size - stroke * 2,
+          height: size - stroke * 2,
+          fontFamily: '"Roboto Mono", monospace',
+          boxShadow: "0 0 0 2px rgba(0,0,0,0.12) inset",
+        }}
       >
         {label && <div className="text-5xl font-bold leading-none">{label}</div>}
         {sublabel && (
-          <div className="mt-3 text-xl font-bold uppercase tracking-[0.12em]">
+          <div className="mt-3 text-xl font-bold uppercase tracking-[0.12em] text-black/90">
             {sublabel}
           </div>
         )}

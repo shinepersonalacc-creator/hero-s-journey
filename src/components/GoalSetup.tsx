@@ -131,16 +131,20 @@ export function GoalSetup({
             href={DISCORD_URL}
             className="inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-6 py-3 text-base font-bold text-black shadow-sm transition hover:bg-black/5"
           >
-            Join our Discord
+            Leave us your feedback in Discord
           </a>
         </div>
 
-        <div className="mt-6 overflow-hidden rounded-3xl border-2 border-black bg-white p-3 shadow-xl">
-          <img
-            src="/Image/about-curator.png"
-            alt="About the curator"
-            className="h-auto w-full rounded-2xl"
-          />
+        <div
+          className="mt-6 rounded-3xl border-2 border-black bg-white p-5 text-left text-sm font-bold leading-relaxed text-black shadow-xl md:text-base"
+          style={{ fontFamily: '"Roboto Mono", monospace' }}
+        >
+          <p>
+            Hi, I&apos;m Shine, a little bit about me, I have a background in design and psychology - and in my free time I like to make stuff.
+          </p>
+          <p className="mt-4">
+            Hero&apos;s Journey was a product of a severe insomnia and determination to get my life together (to the best of my ability). I&apos;ve always been into the idea of gamifying growth and there are several apps that have inspired this journey - Habitica, Discord, Notion and Forest.
+          </p>
         </div>
 
         {googleSignedIn && (

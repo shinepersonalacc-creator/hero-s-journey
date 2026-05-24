@@ -85,7 +85,9 @@ export function CategoryCard({ category, onChange, onDelete, onComplete, onMove 
                   autoFocus
                 />
               ) : (
-                <h3 className="font-display text-xl font-semibold text-black">{category.name}</h3>
+                <h3 className="font-display text-xl font-semibold text-black break-words whitespace-normal">
+                  {category.name}
+                </h3>
               )}
               <div className="mt-0.5 flex items-center gap-2 text-xs text-black/70">
                 <Flame className="size-3 text-black" />
@@ -138,7 +140,7 @@ export function CategoryCard({ category, onChange, onDelete, onComplete, onMove 
                 >
                   {done && <Check className="size-4 text-black" strokeWidth={3} />}
                 </button>
-                <span className={`flex-1 text-sm ${done ? "text-black font-semibold" : "text-black"}`}>
+                <span className={`min-w-0 flex-1 break-words whitespace-normal text-sm ${done ? "text-black font-semibold" : "text-black"}`}>
                   {t.title}
                 </span>
                 <span className="rounded-md border border-black/10 bg-black/5 px-3 py-1 font-display text-sm font-semibold text-black">

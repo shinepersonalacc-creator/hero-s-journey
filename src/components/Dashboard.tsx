@@ -26,7 +26,6 @@ import {
   Trophy,
   Users,
   Video,
-  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
@@ -56,7 +55,6 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
   const [creatingSession, setCreatingSession] = useState(false);
   const [chapterIntroLevel, setChapterIntroLevel] = useState<number | null>(null);
   const [levelUpLevel, setLevelUpLevel] = useState<number | null>(null);
-  const [curatorOpen, setCuratorOpen] = useState(false);
   const chapterTimer = useRef<number | null>(null);
 
   const today = todayKey();
@@ -143,14 +141,23 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
     }));
 
   const createSession = async () => {
+    if (!sessionName.trim()) {
+      setSessionError("Enter a session name first.");
+      return;
+    }
+
     setSessionError("");
     setCreatingSession(true);
 
     try {
       const session = await createSharedSession(sessionName);
-      router.navigate({ to: "/session/$sessionId", params: { sessionId: session.id } });
+      if (!session?.id) {
+        throw new Error("Session creation failed. Please try again.");
+      }
+      await router.navigate({ to: "/session/$sessionId", params: { sessionId: session.id } });
     } catch (error) {
       setSessionError(getErrorMessage(error, "Could not create session."));
+    } finally {
       setCreatingSession(false);
     }
   };
@@ -194,8 +201,6 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
     return (
       <ChapterIntro
         level={chapterIntroLevel}
-        goal={displayedGoal}
-        onGoalChange={(goal) => setState((s) => ({ ...s, goal, draftGoal: goal }))}
         onNext={() => setChapterIntroLevel(null)}
       />
     );
@@ -206,27 +211,19 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
       className={`relative min-h-screen overflow-y-auto ${levelUpLevel ? "level-up-falling" : ""}`}
       style={stageBackground}
     >
+      <div className="fixed right-5 top-5 z-50 flex flex-wrap items-center justify-end gap-3">
+        <a
+          href={DISCORD_URL}
+          className="inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-4 py-2 font-bold text-black shadow-sm transition hover:bg-black/5"
+        >
+          Leave us your feedback in Discord
+        </a>
+        <LogoutButton />
+      </div>
       <div className="mx-auto max-w-7xl px-6 py-10 md:py-14">
         <header className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
           <div className="level-fall-item flex-1" style={{ animationDelay: "0ms" }}>
-            <div className="flex flex-wrap items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setCuratorOpen(true)}
-                className="inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-4 py-2 font-bold text-black shadow-sm transition hover:bg-black/5"
-              >
-                About the curator
-              </button>
-              <a
-                href={DISCORD_URL}
-                className="inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-4 py-2 font-bold text-black shadow-sm transition hover:bg-black/5"
-              >
-                Join our Discord
-              </a>
-              <LogoutButton />
-            </div>
-
-            <div className="mt-3 inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-widest text-black shadow-sm">
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-4 py-2 text-base md:text-lg font-bold uppercase tracking-[0.18em] text-black shadow-sm">
               <Target className="size-3" /> {chapter.label}
             </div>
 
@@ -255,33 +252,33 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
               />
               <button
                 onClick={() => setVideoOpen(true)}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-black bg-white text-black shadow-sm transition hover:bg-black/5"
-                aria-label="Open camera"
+                className="inline-flex h-11 items-center justify-center rounded-full border-2 border-black bg-white px-4 font-bold text-black shadow-sm transition hover:bg-black/5"
+                aria-label="video"
               >
-                <Video className="size-4" />
+                video
               </button>
               <button
                 onClick={() => setSessionDialogOpen(true)}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-black bg-white text-black shadow-sm transition hover:bg-black/5"
-                aria-label="Create session"
+                className="inline-flex h-11 items-center justify-center rounded-full border-2 border-black bg-white px-4 font-bold text-black shadow-sm transition hover:bg-black/5"
+                aria-label="session"
               >
-                <Users className="size-4" />
+                session
               </button>
               <button
                 onClick={goHome}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-black bg-white text-black shadow-sm transition hover:bg-black/5"
-                aria-label="Go home"
+                className="inline-flex h-11 items-center justify-center rounded-full border-2 border-black bg-white px-4 font-bold text-black shadow-sm transition hover:bg-black/5"
+                aria-label="home"
               >
-                <Home className="size-4" />
+                home
               </button>
               <AddCategoryDialog
                 onAdd={addCategory}
                 trigger={
                   <button
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-black bg-white text-black shadow-sm transition hover:bg-black/5"
-                    aria-label="Add category"
+                    className="inline-flex h-11 items-center justify-center rounded-full border-2 border-black bg-white px-4 font-bold text-black shadow-sm transition hover:bg-black/5"
+                    aria-label="ccategory"
                   >
-                    <Plus className="size-4" />
+                    ccategory
                   </button>
                 }
               />
@@ -412,25 +409,6 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
           </div>
         </section>
       </div>
-      {curatorOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8">
-          <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border-2 border-black bg-white p-3 shadow-2xl">
-            <button
-              type="button"
-              onClick={() => setCuratorOpen(false)}
-              className="absolute right-5 top-5 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-black bg-white text-black shadow-sm hover:bg-black/5"
-              aria-label="Close about the curator"
-            >
-              <X className="size-5" />
-            </button>
-            <img
-              src="/Image/about-curator.png"
-              alt="About the curator"
-              className="h-auto w-full rounded-2xl"
-            />
-          </div>
-        </div>
-      )}
       <VideoCallBox open={videoOpen} onOpenChange={setVideoOpen} />
       {sessionDialogOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4">
@@ -524,25 +502,12 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 function ChapterIntro({
   level,
-  goal,
-  onGoalChange,
   onNext,
 }: {
   level: number;
-  goal: string;
-  onGoalChange: (goal: string) => void;
   onNext: () => void;
 }) {
-  const [editingGoal, setEditingGoal] = useState(false);
-  const [draftGoal, setDraftGoal] = useState(goal);
   const chapter = getChapterInfo(level);
-
-  const saveGoal = () => {
-    const nextGoal = draftGoal.trim() || goal;
-    onGoalChange(nextGoal);
-    setDraftGoal(nextGoal);
-    setEditingGoal(false);
-  };
 
   return (
     <div
@@ -567,35 +532,6 @@ function ChapterIntro({
         style={{ fontFamily: '"Roboto Mono", monospace' }}
       >
         {chapter.description}
-      </div>
-
-      <div className="mt-8 w-full max-w-3xl rounded-3xl border-2 border-black bg-white p-5 text-black shadow-xl">
-        <div className="mt-3 flex items-start gap-3 text-left">
-          {editingGoal ? (
-            <Textarea
-              value={draftGoal}
-              onChange={(event) => setDraftGoal(event.target.value)}
-              rows={4}
-              className="min-h-28 flex-1 resize-none rounded-xl border-2 border-black bg-white text-base font-bold text-black"
-              style={{ fontFamily: '"Roboto Mono", monospace' }}
-            />
-          ) : (
-            <div
-              className="min-w-0 flex-1 text-base font-bold leading-relaxed md:text-lg"
-              style={{ fontFamily: '"Roboto Mono", monospace' }}
-            >
-              {goal}
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={editingGoal ? saveGoal : () => setEditingGoal(true)}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/10 text-black hover:bg-black/20"
-            aria-label={editingGoal ? "Save goal" : "Edit goal"}
-          >
-            {editingGoal ? <Check className="size-4" /> : <Pencil className="size-4" />}
-          </button>
-        </div>
       </div>
 
       <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
@@ -630,10 +566,10 @@ function CategoryVisibilityPicker({
     <div className="relative">
       <button
         onClick={() => onOpenChange(!open)}
-        className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-black bg-white text-black shadow-sm transition hover:bg-black/5"
-        aria-label="Choose visible categories"
+        className="inline-flex h-11 items-center justify-center rounded-full border-2 border-black bg-white px-4 font-bold text-black shadow-sm transition hover:bg-black/5"
+        aria-label="visiblity"
       >
-        <Eye className="size-4" />
+        visiblity
       </button>
 
       {open && (

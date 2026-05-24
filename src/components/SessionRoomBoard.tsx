@@ -119,6 +119,7 @@ export function SessionRoomBoard({ sessionId, categories, localXP, hostUserId }:
   const [displayName, setDisplayName] = useState("Session guest");
   const [userId, setUserId] = useState<string | null>(null);
   const [localCardPosition, setLocalCardPosition] = useState<{ x: number; y: number } | null>(null);
+  const [resizableCards, setResizableCards] = useState(false);
 
 
   const selectedCategory = useMemo(
@@ -521,6 +522,13 @@ export function SessionRoomBoard({ sessionId, categories, localXP, hostUserId }:
           <Maximize2 className="size-4" />
           Camera window
         </button>
+        <button
+          type="button"
+          onClick={() => setResizableCards((current) => !current)}
+          className="inline-flex h-11 items-center gap-2 rounded-xl border-2 border-black bg-white px-4 font-bold text-black hover:bg-black/5"
+        >
+          {resizableCards ? "Lock sizes" : "Resize boxes"}
+        </button>
       </div>
 
       {!categories.length && (
@@ -542,6 +550,7 @@ export function SessionRoomBoard({ sessionId, categories, localXP, hostUserId }:
               trackPresence(cameraActive, position);
             } : undefined}
             isHost={isHost}
+            resizable={resizableCards}
             onRemove={participant.participantId !== participantId ? kickParticipant : undefined}
           />
         ))}
@@ -600,6 +609,7 @@ function ParticipantCategoryCard({
   position,
   onDragStop,
   isHost,
+  resizable,
   onRemove,
 }: {
   participant: ParticipantPresence;
@@ -608,6 +618,7 @@ function ParticipantCategoryCard({
   position?: { x: number; y: number } | null;
   onDragStop?: (position: { x: number; y: number }) => void;
   isHost: boolean;
+  resizable?: boolean;
   onRemove?: (participantId: string) => void;
 }) {
   const nodeRef = useRef<HTMLDivElement>(null);
@@ -619,10 +630,14 @@ function ParticipantCategoryCard({
   const card = (
     <div
       ref={nodeRef}
-      className={`absolute left-0 top-0 w-[320px] rounded-2xl border-2 border-black bg-white p-4 text-black shadow-xl ${
+      className={`absolute left-0 top-0 w-[min(320px,calc(100vw-2rem))] max-w-full min-w-[260px] rounded-2xl border-2 border-black bg-white p-4 text-black shadow-xl ${
         canDrag ? "cursor-grab active:cursor-grabbing" : ""
-      }`}
-      style={!canDrag ? { transform: `translate(${currentPosition.x}px, ${currentPosition.y}px)` } : undefined}
+      } ${resizable ? "resize overflow-auto" : ""}`}
+      style={
+        !canDrag
+          ? { transform: `translate(${currentPosition.x}px, ${currentPosition.y}px)`, minHeight: 280 }
+          : undefined
+      }
     >
       {isHost && onRemove && (
         <button
@@ -636,7 +651,7 @@ function ParticipantCategoryCard({
       )}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="truncate text-2xl font-black text-black">
+          <div className="text-2xl font-black text-black break-words whitespace-normal">
             {participant.name} - lvl {participant.level ?? 1}
           </div>
           <div className="mt-3 flex items-center gap-3">
@@ -644,7 +659,7 @@ function ParticipantCategoryCard({
               {category.emoji}
             </div>
             <div className="min-w-0">
-              <div className="truncate text-2xl font-bold">{category.name}</div>
+              <div className="text-2xl font-bold break-words whitespace-normal">{category.name}</div>
               <div className="font-semibold text-black/65">{category.tasks.length} quests</div>
             </div>
           </div>
@@ -681,7 +696,7 @@ function ParticipantCategoryCard({
             <span className="flex size-6 shrink-0 items-center justify-center rounded-md border-2 border-black bg-white font-bold">
               {task.checked && <Check className="size-4" strokeWidth={4} />}
             </span>
-            <span className="min-w-0 flex-1 truncate font-semibold">{task.title}</span>
+            <span className="min-w-0 flex-1 break-words whitespace-normal text-sm font-semibold">{task.title}</span>
             <span className="rounded-md bg-black px-2 py-0.5 text-sm font-bold text-white">
               +{task.points}
             </span>

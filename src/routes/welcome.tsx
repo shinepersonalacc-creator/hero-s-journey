@@ -44,10 +44,6 @@ function Welcome() {
     state.goal.trim() && state.goal !== "Hero's Journey" ? state.goal : DEFAULT_GOAL_PROMPT;
 
   useEffect(() => {
-    if (!editingVision) setDraftVision(state.draftGoal || state.goal);
-  }, [editingVision, state.draftGoal, state.goal]);
-
-  useEffect(() => {
     const syncProfile = async () => {
       setCheckingProfile(true);
 
@@ -223,37 +219,6 @@ function Welcome() {
         >
           {firstChapter.description}
         </div>
-
-        {(state.goal || displayedGoal) && (
-          <div className="mt-8 w-full max-w-3xl rounded-3xl border-2 border-black bg-white p-5 text-black shadow-xl">
-            <div className="mt-3 flex items-start gap-3 text-left">
-              {editingVision ? (
-                <Textarea
-                  value={draftVision || displayedGoal}
-                  onChange={(event) => setDraftVision(event.target.value)}
-                  rows={4}
-                  className="min-h-28 flex-1 resize-none rounded-xl border-2 border-black bg-white text-base font-bold text-black"
-                  style={{ fontFamily: '"Roboto Mono", monospace' }}
-                />
-              ) : (
-                <div
-                  className="min-w-0 flex-1 text-base font-bold leading-relaxed md:text-lg"
-                  style={{ fontFamily: '"Roboto Mono", monospace' }}
-                >
-                  {displayedGoal}
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={editingVision ? saveVision : () => setEditingVision(true)}
-                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/10 text-black hover:bg-black/20"
-                aria-label={editingVision ? "Save vision" : "Edit vision"}
-              >
-                {editingVision ? <Check className="size-4" /> : <Pencil className="size-4" />}
-              </button>
-            </div>
-          </div>
-        )}
 
         <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
           <button

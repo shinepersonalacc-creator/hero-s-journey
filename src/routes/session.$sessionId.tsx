@@ -1,12 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Home } from "lucide-react";
+import { Copy } from "lucide-react";
 import { SessionRoomBoard } from "@/components/SessionRoomBoard";
 import { supabase } from "@/lib/supabase";
 import { useAppState } from "@/lib/storage";
 import { loadUserXP } from "@/lib/profile";
 import { getSiteUrl } from "@/lib/site";
 import { endSharedSession, loadSharedSession, type SharedSession } from "@/lib/sessions";
+import sessionBackground from "../../images/Untitled design.png";
 
 export const Route = createFileRoute("/session/$sessionId")({
   head: () => ({
@@ -21,6 +22,8 @@ function SessionPage() {
   const [session, setSession] = useState<SharedSession | null>(null);
   const [cloudXP, setCloudXP] = useState(0);
   const [signedIn, setSignedIn] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState("Guest");
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const postSignInStorageKey = "ascend.postSignInSessionId";
@@ -41,6 +44,13 @@ function SessionPage() {
       ]);
 
       setSignedIn(Boolean(data.session));
+      setCurrentUserId(data.session?.user?.id ?? null);
+      const userName =
+        data.session?.user?.user_metadata?.full_name ||
+        data.session?.user?.user_metadata?.name ||
+        data.session?.user?.email?.split("@")[0] ||
+        "Guest";
+      setDisplayName(userName);
       setSession(loadedSession);
       if (profile) setCloudXP(profile.xp);
     } catch (refreshError) {
@@ -111,21 +121,21 @@ function SessionPage() {
     <div
       className="min-h-screen bg-no-repeat px-6 py-8 text-white"
       style={{
-        backgroundImage: "url('/Image/adventurebg.png')",
-        backgroundSize: "auto 100vh",
-        backgroundPosition: "center",
-        backgroundAttachment: "fixed",
+        backgroundImage: `url(${sessionBackground}), url(${sessionBackground})`,
+        backgroundSize: "auto 100vh, auto 100vh",
+        backgroundPosition: "center top, center bottom",
+        backgroundRepeat: "no-repeat, no-repeat",
+        backgroundAttachment: "scroll",
       }}
     >
       <div className="mx-auto max-w-5xl">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <a
-            href="/"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white hover:bg-white/20"
-            aria-label="Home"
-          >
-            <Home className="size-4" />
-          </a>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold uppercase tracking-[0.18em] text-white">
+              home
+            </span>
+            <span className="text-sm font-semibold text-white/90">{displayName}</span>
+          </div>
 
           <button
             type="button"
@@ -143,13 +153,23 @@ function SessionPage() {
             <h1 className="text-5xl font-bold text-white md:text-7xl">
               {session?.name ?? "Loading session..."}
             </h1>
-            <button
-              type="button"
-              onClick={endSession}
-              className="rounded-none border-2 border-white bg-black px-5 py-3 font-bold text-white shadow-[4px_4px_0_rgba(255,255,255,0.22)] hover:bg-black/85"
-            >
-              End session
-            </button>
+            {session?.created_by && currentUserId === session.created_by ? (
+              <button
+                type="button"
+                onClick={endSession}
+                className="rounded-none border-2 border-white bg-black px-5 py-3 font-bold text-white shadow-[4px_4px_0_rgba(255,255,255,0.22)] hover:bg-black/85"
+              >
+                End session
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => (window.location.href = "/")}
+                className="rounded-none border-2 border-white bg-black px-5 py-3 font-bold text-white shadow-[4px_4px_0_rgba(255,255,255,0.22)] hover:bg-black/85"
+              >
+                Leave session
+              </button>
+            )}
           </div>
           <div className="mt-3 max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-xl bg-black/35 px-4 py-2 font-mono text-sm text-white/85">
             ID: {sessionId}
@@ -179,6 +199,7 @@ function SessionPage() {
             sessionId={sessionId}
             categories={appState.categories}
             localXP={cloudXP}
+            hostUserId={session?.created_by ?? null}
           />
         )}
       </div>
