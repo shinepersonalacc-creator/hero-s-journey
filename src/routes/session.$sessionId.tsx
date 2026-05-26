@@ -142,7 +142,7 @@ function SessionPage() {
     const { error: signInError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${getSiteUrl()}/`,
+        redirectTo: shareLink,
       },
     });
 
