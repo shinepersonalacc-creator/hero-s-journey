@@ -1,12 +1,12 @@
 export const OFFICIAL_SITE_URL = "https://herosjourney.xyz";
-export const LOCAL_SITE_URL = import.meta.env.VITE_SITE_URL ?? OFFICIAL_SITE_URL;
+export const LOCAL_SITE_URL = import.meta.env.VITE_SITE_URL;
 
 export function getSiteUrl() {
   if (LOCAL_SITE_URL) {
     return LOCAL_SITE_URL;
   }
 
-  if (typeof window !== "undefined" && !window.location.hostname.includes("localhost")) {
+  if (typeof window !== "undefined") {
     return window.location.origin;
   }
 
