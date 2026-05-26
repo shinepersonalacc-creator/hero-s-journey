@@ -99,9 +99,12 @@ function Index() {
     };
   }, [hydrated, setState]);
 
+  const localHasStartedJourney = Boolean(
+    state.hasStartedJourney || state.goal || state.draftGoal || state.categories.length,
+  );
+  const needsSignedInOnboarding = signedIn && !checkingProfile && !cloudOnboardingComplete;
   const hasStartedJourney =
-    cloudOnboardingComplete ||
-    Boolean(state.hasStartedJourney || state.goal || state.draftGoal || state.categories.length);
+    cloudOnboardingComplete || (!needsSignedInOnboarding && localHasStartedJourney);
 
   const shouldResumeDashboard =
     signedIn && !checkingProfile && cloudOnboardingComplete && !state.goal;
@@ -133,7 +136,7 @@ function Index() {
 
   if (shouldResumeDashboard) return <div className="min-h-screen" />;
 
-  if (!state.goal) {
+  if (needsSignedInOnboarding || !state.goal) {
     return (
       <GoalSetup
         initialGoal={state.draftGoal || state.goal}
