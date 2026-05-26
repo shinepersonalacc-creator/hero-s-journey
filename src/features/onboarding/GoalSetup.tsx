@@ -114,18 +114,23 @@ export function GoalSetup({
           <span className="text-outline-black">Hero's Journey</span>
         </h1>
 
-        <button
-          type="button"
-          onClick={signInWithGoogle}
-          disabled={googleSignedIn}
-          className="mt-6 inline-flex items-center justify-center gap-3 self-center rounded-full border-2 border-black bg-white px-6 py-3 text-base font-bold text-black shadow-sm transition hover:bg-white/90"
-          aria-label="Sign in with Google"
-        >
-          <span className="flex size-7 items-center justify-center rounded-full border border-black/15 bg-white font-sans text-lg font-bold text-[#4285f4]">
-            G
-          </span>
-          {googleSignedIn ? "Google sign-in complete" : "Sign in with Google"}
-        </button>
+        {!googleSignedIn ? (
+          <button
+            type="button"
+            onClick={signInWithGoogle}
+            className="mt-6 inline-flex items-center justify-center gap-3 self-center rounded-full border-2 border-black bg-white px-6 py-3 text-base font-bold text-black shadow-sm transition hover:bg-white/90"
+            aria-label="Sign in with Google"
+          >
+            <span className="flex size-7 items-center justify-center rounded-full border border-black/15 bg-white font-sans text-lg font-bold text-[#4285f4]">
+              G
+            </span>
+            Sign in with Google
+          </button>
+        ) : (
+          <div className="mt-6 self-center rounded-full border-2 border-black bg-white px-6 py-3 text-base font-bold text-black shadow-sm">
+            Google sign-in complete
+          </div>
+        )}
         {signInError && (
           <div className="mt-3 rounded-xl bg-black px-4 py-2 text-center text-sm font-semibold text-white">
             {signInError}

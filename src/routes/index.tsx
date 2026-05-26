@@ -58,21 +58,40 @@ function Index() {
     let cancelled = false;
 
     const syncCloudXP = async () => {
-      const { data } = await supabase.auth.getUser();
-      const profile = data.user ? await ensureUserProfile() : null;
-      const cloudXP = data.user ? await loadUserXP() : null;
+      setCheckingProfile(true);
 
-      if (cancelled) return;
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const user = session?.user ?? null;
+        const profile = user ? await ensureUserProfile() : null;
+        const cloudXP = user ? await loadUserXP() : null;
 
-      setSignedIn(Boolean(data.user));
-      setDisplayName(data.user ? getDisplayNameFromMetadata(data.user.user_metadata) : "");
-      setCloudOnboardingComplete(
-        data.user ? hasCompletedOnboardingFromMetadata(data.user.user_metadata) : false,
-      );
-      setProfile(profile);
-      setCheckingProfile(false);
+        if (cancelled) return;
 
-      if (cloudXP) setState((current) => ({ ...current, totalPoints: cloudXP.xp }));
+        setSignedIn(Boolean(user));
+        setDisplayName(user ? getDisplayNameFromMetadata(user.user_metadata) : "");
+        setCloudOnboardingComplete(
+          user ? hasCompletedOnboardingFromMetadata(user.user_metadata) : false,
+        );
+        setProfile(profile);
+
+        if (cloudXP) setState((current) => ({ ...current, totalPoints: cloudXP.xp }));
+      } catch (error) {
+        console.error("Could not sync auth state:", error);
+
+        if (!cancelled) {
+          setSignedIn(false);
+          setDisplayName("");
+          setCloudOnboardingComplete(false);
+          setProfile(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setCheckingProfile(false);
+        }
+      }
     };
 
     syncCloudXP();
