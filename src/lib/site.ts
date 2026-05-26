@@ -3,7 +3,7 @@ export const LOCAL_SITE_URL = import.meta.env.VITE_SITE_URL;
 
 export function getSiteUrl() {
   if (LOCAL_SITE_URL) {
-    return LOCAL_SITE_URL;
+    return LOCAL_SITE_URL.replace(/\/+$/, "");
   }
 
   if (typeof window !== "undefined") {

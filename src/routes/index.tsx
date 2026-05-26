@@ -132,7 +132,7 @@ function Index() {
     }));
   }, [setState, shouldResumeDashboard, state.draftGoal]);
 
-  if (!hydrated) return <div className="min-h-screen" />;
+  if (!hydrated || checkingProfile) return <div className="min-h-screen" />;
 
   if (needsProfile) {
     return (
