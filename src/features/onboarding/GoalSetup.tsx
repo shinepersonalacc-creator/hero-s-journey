@@ -15,20 +15,26 @@ const DISCORD_URL = "https://discord.gg/cyqGzSPf";
 export function GoalSetup({
   initialGoal = "",
   hasStartedJourney = false,
+  signedIn = false,
   onDraftChange,
   onSave,
   onContinue,
 }: {
   initialGoal?: string;
   hasStartedJourney?: boolean;
+  signedIn?: boolean;
   onDraftChange?: (goal: string) => void;
   onSave: (goal: string) => void;
   onContinue: (goal?: string) => void;
 }) {
   const [val, setVal] = useState(initialGoal);
-  const [googleSignedIn, setGoogleSignedIn] = useState(false);
+  const [googleSignedIn, setGoogleSignedIn] = useState(signedIn);
   const [needsProfile, setNeedsProfile] = useState(false);
   const [signInError, setSignInError] = useState("");
+
+  useEffect(() => {
+    setGoogleSignedIn(signedIn);
+  }, [signedIn]);
 
   useEffect(() => {
     let mounted = true;

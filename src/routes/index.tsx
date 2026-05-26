@@ -2,9 +2,9 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAppState } from "@/services/storage/storage";
 import {
+  ensureUserProfile,
   getDisplayNameFromMetadata,
   hasCompletedOnboardingFromMetadata,
-  loadUserProfile,
   loadUserXP,
 } from "@/services/supabase/profile";
 import { supabase } from "@/services/supabase/supabase";
@@ -59,7 +59,7 @@ function Index() {
 
     const syncCloudXP = async () => {
       const { data } = await supabase.auth.getUser();
-      const profile = data.user ? await loadUserProfile() : null;
+      const profile = data.user ? await ensureUserProfile() : null;
       const cloudXP = data.user ? await loadUserXP() : null;
 
       if (cancelled) return;
@@ -102,12 +102,23 @@ function Index() {
   const localHasStartedJourney = Boolean(
     state.hasStartedJourney || state.goal || state.draftGoal || state.categories.length,
   );
-  const needsSignedInOnboarding = signedIn && !checkingProfile && !cloudOnboardingComplete;
+  const profileComplete = Boolean(displayName && profile?.gender);
+  const needsProfile = signedIn && !checkingProfile && !profileComplete;
+  const needsSignedInOnboarding =
+    signedIn &&
+    !checkingProfile &&
+    profileComplete &&
+    !cloudOnboardingComplete &&
+    !localHasStartedJourney;
   const hasStartedJourney =
     cloudOnboardingComplete || (!needsSignedInOnboarding && localHasStartedJourney);
 
   const shouldResumeDashboard =
-    signedIn && !checkingProfile && cloudOnboardingComplete && !state.goal;
+    signedIn &&
+    !checkingProfile &&
+    profileComplete &&
+    (cloudOnboardingComplete || localHasStartedJourney) &&
+    !state.goal;
 
   useEffect(() => {
     if (!shouldResumeDashboard) return;
@@ -123,7 +134,7 @@ function Index() {
 
   if (!hydrated) return <div className="min-h-screen" />;
 
-  if (signedIn && !checkingProfile && (!displayName || !profile?.gender)) {
+  if (needsProfile) {
     return (
       <DisplayNamePrompt
         onComplete={(displayName, gender) => {
@@ -141,6 +152,7 @@ function Index() {
       <GoalSetup
         initialGoal={state.draftGoal || state.goal}
         hasStartedJourney={hasStartedJourney}
+        signedIn={signedIn}
         onDraftChange={(goal) => {
           setState((s) => ({ ...s, draftGoal: goal }));
         }}
