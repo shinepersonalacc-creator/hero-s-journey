@@ -1,4 +1,4 @@
-export const OFFICIAL_SITE_URL = "https://herosjourney.xyz";
+export const OFFICIAL_SITE_URL = "https://heros-journey.xyz";
 export const LOCAL_SITE_URL = import.meta.env.VITE_SITE_URL;
 
 export function getSiteUrl() {
