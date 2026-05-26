@@ -121,7 +121,7 @@ function Index() {
   const localHasStartedJourney = Boolean(
     state.hasStartedJourney || state.goal || state.draftGoal || state.categories.length,
   );
-  const profileComplete = Boolean(displayName && profile?.gender);
+  const profileComplete = Boolean(displayName);
   const needsProfile = signedIn && !checkingProfile && !profileComplete;
   const needsSignedInOnboarding =
     signedIn &&
