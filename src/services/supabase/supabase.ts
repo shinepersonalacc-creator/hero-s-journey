@@ -4,7 +4,8 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const fallbackSupabaseUrl = "https://bfvhkjzzjexzyazmlbqp.supabase.co";
 const fallbackSupabaseAnonKey = "missing-supabase-anon-key";
-
+console.log(import.meta.env.VITE_SUPABASE_URL)
+console.log(import.meta.env.VITE_SUPABASE_ANON_KEY)
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
 if (!isSupabaseConfigured && import.meta.env.DEV) {

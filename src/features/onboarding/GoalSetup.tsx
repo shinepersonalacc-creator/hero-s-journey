@@ -1,13 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/forms/button";
 import { supabase } from "@/services/supabase/supabase";
-import {
-  ensureUserProfile,
-  getDisplayNameFromMetadata,
-  loadUserProfile,
-} from "@/services/supabase/profile";
 import { getSiteUrl } from "@/lib/site";
-import { DisplayNamePrompt } from "@/features/onboarding/DisplayNamePrompt";
 import { LogoutButton } from "@/features/auth/LogoutButton";
 
 const DISCORD_URL = "https://discord.gg/cyqGzSPf";
@@ -28,49 +22,7 @@ export function GoalSetup({
   onContinue: (goal?: string) => void;
 }) {
   const [val, setVal] = useState(initialGoal);
-  const [googleSignedIn, setGoogleSignedIn] = useState(signedIn);
-  const [needsProfile, setNeedsProfile] = useState(false);
   const [signInError, setSignInError] = useState("");
-
-  useEffect(() => {
-    setGoogleSignedIn(signedIn);
-  }, [signedIn]);
-
-  useEffect(() => {
-    let mounted = true;
-
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (data.session) {
-        const profile = await ensureUserProfile();
-        const displayName = getDisplayNameFromMetadata(data.session.user.user_metadata);
-        if (mounted) {
-          setGoogleSignedIn(true);
-          setNeedsProfile(!displayName || !profile?.gender);
-        }
-      } else if (mounted) {
-        setGoogleSignedIn(false);
-        setNeedsProfile(false);
-      }
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session) {
-        const profile = await loadUserProfile();
-        setGoogleSignedIn(true);
-        setNeedsProfile(!getDisplayNameFromMetadata(session.user.user_metadata) || !profile?.gender);
-      } else {
-        setGoogleSignedIn(false);
-        setNeedsProfile(false);
-      }
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
 
   const signInWithGoogle = async () => {
     setSignInError("");
@@ -85,10 +37,6 @@ export function GoalSetup({
     if (error) setSignInError(error.message);
   };
 
-  if (googleSignedIn && needsProfile) {
-    return <DisplayNamePrompt onComplete={() => setNeedsProfile(false)} />;
-  }
-
   return (
     <div
       className="min-h-dvh overflow-y-auto bg-no-repeat"
@@ -99,7 +47,7 @@ export function GoalSetup({
       }}
     >
       <div className="mx-auto flex min-h-dvh max-w-2xl flex-col justify-center px-6 py-10 md:py-16">
-        {googleSignedIn && (
+        {signedIn && (
           <div className="mb-6 flex justify-end">
             <LogoutButton />
           </div>
@@ -114,7 +62,7 @@ export function GoalSetup({
           <span className="text-outline-black">Hero's Journey</span>
         </h1>
 
-        {!googleSignedIn ? (
+        {!signedIn ? (
           <button
             type="button"
             onClick={signInWithGoogle}
@@ -158,7 +106,7 @@ export function GoalSetup({
           </p>
         </div>
 
-        {googleSignedIn && (
+        {signedIn && (
           <>
             {hasStartedJourney ? (
               <div className="mt-6 rounded-3xl bg-black p-4 text-center shadow-xl">
