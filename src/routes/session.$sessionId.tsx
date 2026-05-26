@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Copy } from "lucide-react";
-import { SessionRoomBoard } from "@/components/SessionRoomBoard";
-import { supabase } from "@/lib/supabase";
-import { useAppState } from "@/lib/storage";
-import { loadUserXP } from "@/lib/profile";
+import { SessionRoomBoard } from "@/features/sessions/SessionRoomBoard";
+import { supabase } from "@/services/supabase/supabase";
+import { useAppState } from "@/services/storage/storage";
+import { loadUserXP } from "@/services/supabase/profile";
 import { getSiteUrl } from "@/lib/site";
-import { endSharedSession, loadSharedSession, type SharedSession } from "@/lib/sessions";
+import { endSharedSession, loadSharedSession, type SharedSession } from "@/services/supabase/sessions";
 import sessionBackground from "../../images/Untitled design.png";
 
 export const Route = createFileRoute("/session/$sessionId")({
@@ -37,11 +37,7 @@ function SessionPage() {
     setError("");
 
     try {
-      const [{ data }, loadedSession, profile] = await Promise.all([
-        supabase.auth.getSession(),
-        loadSharedSession(sessionId),
-        loadUserXP(),
-      ]);
+      const { data } = await supabase.auth.getSession();
 
       setSignedIn(Boolean(data.session));
       setCurrentUserId(data.session?.user?.id ?? null);
@@ -51,8 +47,20 @@ function SessionPage() {
         data.session?.user?.email?.split("@")[0] ||
         "Guest";
       setDisplayName(userName);
+
+      if (!data.session) {
+        setSession(null);
+        setCloudXP(0);
+        return;
+      }
+
+      const [loadedSession, profile] = await Promise.all([
+        loadSharedSession(sessionId),
+        loadUserXP(),
+      ]);
+
       setSession(loadedSession);
-      if (profile) setCloudXP(profile.xp);
+      setCloudXP(profile?.xp ?? 0);
     } catch (refreshError) {
       setError(refreshError instanceof Error ? refreshError.message : "Could not load session.");
     }
@@ -87,6 +95,45 @@ function SessionPage() {
   };
 }, [sessionId])
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const html = document.documentElement;
+    const body = document.body;
+
+    const originalHtmlBackground = html.style.background;
+    const originalHtmlBackgroundImage = html.style.backgroundImage;
+    const originalBodyBackground = body.style.background;
+    const originalBodyBackgroundImage = body.style.backgroundImage;
+    const originalBodyBackgroundRepeat = body.style.backgroundRepeat;
+    const originalBodyBackgroundPosition = body.style.backgroundPosition;
+    const originalBodyBackgroundSize = body.style.backgroundSize;
+    const originalBodyBackgroundAttachment = body.style.backgroundAttachment;
+    const originalBodyBackgroundColor = body.style.backgroundColor;
+
+    html.style.background = "transparent";
+    html.style.backgroundImage = "none";
+    body.style.background = "transparent";
+    body.style.backgroundImage = "none";
+    body.style.backgroundRepeat = "no-repeat";
+    body.style.backgroundPosition = "top center";
+    body.style.backgroundSize = "auto";
+    body.style.backgroundAttachment = "scroll";
+    body.style.backgroundColor = "transparent";
+
+    return () => {
+      html.style.background = originalHtmlBackground;
+      html.style.backgroundImage = originalHtmlBackgroundImage;
+      body.style.background = originalBodyBackground;
+      body.style.backgroundImage = originalBodyBackgroundImage;
+      body.style.backgroundRepeat = originalBodyBackgroundRepeat;
+      body.style.backgroundPosition = originalBodyBackgroundPosition;
+      body.style.backgroundSize = originalBodyBackgroundSize;
+      body.style.backgroundAttachment = originalBodyBackgroundAttachment;
+      body.style.backgroundColor = originalBodyBackgroundColor;
+    };
+  }, []);
+
   const signInWithGoogle = async () => {
     if (typeof window !== "undefined") {
       window.localStorage.setItem(postSignInStorageKey, sessionId);
@@ -119,12 +166,12 @@ function SessionPage() {
 
   return (
     <div
-      className="min-h-screen bg-no-repeat px-6 py-8 text-white"
+      className="min-h-screen px-6 py-8 text-white"
       style={{
-        backgroundImage: `url(${sessionBackground}), url(${sessionBackground})`,
-        backgroundSize: "auto 100vh, auto 100vh",
-        backgroundPosition: "center top, center bottom",
-        backgroundRepeat: "no-repeat, no-repeat",
+        backgroundImage: `url(${sessionBackground})`,
+        backgroundSize: "100% auto",
+        backgroundPosition: "top center",
+        backgroundRepeat: "repeat-y",
         backgroundAttachment: "scroll",
       }}
     >
@@ -154,6 +201,7 @@ function SessionPage() {
               {session?.name ?? "Loading session..."}
             </h1>
             {session?.created_by && currentUserId === session.created_by ? (
+              // UI-only host action control. The backend/database must enforce session ownership.
               <button
                 type="button"
                 onClick={endSession}

@@ -1,16 +1,16 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useAppState } from "@/lib/storage";
+import { useAppState } from "@/services/storage/storage";
 import {
   getDisplayNameFromMetadata,
   hasCompletedOnboardingFromMetadata,
   loadUserProfile,
   loadUserXP,
-} from "@/lib/profile";
-import { supabase } from "@/lib/supabase";
-import { GoalSetup } from "@/components/GoalSetup";
-import { Dashboard } from "@/components/Dashboard";
-import { DisplayNamePrompt } from "@/components/DisplayNamePrompt";
+} from "@/services/supabase/profile";
+import { supabase } from "@/services/supabase/supabase";
+import { GoalSetup } from "@/features/onboarding/GoalSetup";
+import { Dashboard } from "@/features/dashboard/Dashboard";
+import { DisplayNamePrompt } from "@/features/onboarding/DisplayNamePrompt";
 
 const DEFAULT_GOAL_PROMPT = "Where do you see yourself in the end of this journey";
 
@@ -40,6 +40,17 @@ function Index() {
   const [cloudOnboardingComplete, setCloudOnboardingComplete] = useState(false);
   const [checkingProfile, setCheckingProfile] = useState(true);
   const router = useRouter();
+  const postSignInStorageKey = "ascend.postSignInSessionId";
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const redirectSessionId = window.localStorage.getItem(postSignInStorageKey);
+    if (!redirectSessionId) return;
+
+    window.localStorage.removeItem(postSignInStorageKey);
+    router.navigate({ to: "/session/$sessionId", params: { sessionId: redirectSessionId } });
+  }, [router]);
 
   useEffect(() => {
     if (!hydrated) return;

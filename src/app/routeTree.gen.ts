@@ -8,10 +8,10 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root'
-import { Route as WelcomeRouteImport } from './routes/welcome'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as SessionSessionIdRouteImport } from './routes/session.$sessionId'
+import { Route as rootRouteImport } from '../routes/__root.tsx'
+import { Route as WelcomeRouteImport } from '../routes/welcome.tsx'
+import { Route as IndexRouteImport } from '../routes/index'
+import { Route as SessionSessionIdRouteImport } from '../routes/session.$sessionId.tsx'
 
 const WelcomeRoute = WelcomeRouteImport.update({
   id: '/welcome',
@@ -94,8 +94,8 @@ export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
 
-import type { getRouter } from './app/router.ts'
-import type { startInstance } from './app/start.ts'
+import type { getRouter } from './router.ts'
+import type { startInstance } from './start.ts'
 declare module '@tanstack/react-start' {
   interface Register {
     ssr: true

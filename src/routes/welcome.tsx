@@ -1,12 +1,12 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { useAppState, uid } from "@/lib/storage";
-import { DisplayNamePrompt } from "@/components/DisplayNamePrompt";
-import { ensureUserProfile, getDisplayNameFromMetadata, markOnboardingComplete } from "@/lib/profile";
-import { LogoutButton } from "@/components/LogoutButton";
-import { supabase } from "@/lib/supabase";
+import { Input } from "@/components/ui/forms/input";
+import { Textarea } from "@/components/ui/forms/textarea";
+import { useAppState, uid } from "@/services/storage/storage";
+import { DisplayNamePrompt } from "@/features/onboarding/DisplayNamePrompt";
+import { ensureUserProfile, getDisplayNameFromMetadata, markOnboardingComplete } from "@/services/supabase/profile";
+import { LogoutButton } from "@/features/auth/LogoutButton";
+import { supabase } from "@/services/supabase/supabase";
 import {
   getChapterBackgroundImage,
   getChapterBackgroundRepeat,
