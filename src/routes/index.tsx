@@ -38,7 +38,7 @@ function Index() {
   const [displayName, setDisplayName] = useState("");
   const [profile, setProfile] = useState<{ gender?: string | null } | null>(null);
   const [cloudOnboardingComplete, setCloudOnboardingComplete] = useState(false);
-  const [checkingProfile, setCheckingProfile] = useState(true);
+  const [checkingProfile, setCheckingProfile] = useState(false);
   const router = useRouter();
   const postSignInStorageKey = "ascend.postSignInSessionId";
 
