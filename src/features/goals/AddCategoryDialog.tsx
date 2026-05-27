@@ -39,23 +39,24 @@ export function AddCategoryDialog({
         </button>
         )}
       </DialogTrigger>
-      <DialogContent className="border-border bg-card">
+      <DialogContent className="border-2 border-black bg-white text-black shadow-2xl">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl">New quest</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <label className="mb-2 block text-xs uppercase tracking-widest text-muted-foreground">Name</label>
+            <label className="mb-2 block text-xs uppercase tracking-widest text-black/70">Name</label>
             <Input
               autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()}
               placeholder="e.g. Health, Learning, Career"
+              className="border border-black/20 bg-white text-black placeholder:text-black/50"
             />
           </div>
           <div>
-            <label className="mb-2 block text-xs uppercase tracking-widest text-muted-foreground">End goal</label>
+            <label className="mb-2 block text-xs uppercase tracking-widest text-black/70">End goal</label>
             <Input
               value={aim}
               onChange={(e) => setAim(e.target.value)}
@@ -65,14 +66,14 @@ export function AddCategoryDialog({
             />
           </div>
           <div>
-            <label className="mb-2 block text-xs uppercase tracking-widest text-muted-foreground">Icon</label>
+            <label className="mb-2 block text-xs uppercase tracking-widest text-black/70">Icon</label>
             <div className="grid grid-cols-6 gap-2">
               {EMOJIS.map((e) => (
                 <button
                   key={e}
                   onClick={() => setEmoji(e)}
                   className={`flex size-12 items-center justify-center rounded-xl border text-2xl transition ${
-                    emoji === e ? "border-mint bg-mint/10 glow-mint" : "border-border bg-background/40 hover:border-mint/40"
+                    emoji === e ? "border-black bg-[#f7e35b] shadow-sm" : "border-black/20 bg-white hover:border-black"
                   }`}
                 >
                   {e}
