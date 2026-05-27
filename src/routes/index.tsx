@@ -60,6 +60,10 @@ function Index() {
     const syncCloudXP = async () => {
       setCheckingProfile(true);
 
+      const timeout = setTimeout(() => {
+        if (!cancelled) setCheckingProfile(false);
+      }, 5000);
+
       try {
         const {
           data: { session },
@@ -88,6 +92,7 @@ function Index() {
           setProfile(null);
         }
       } finally {
+        clearTimeout(timeout);
         if (!cancelled) {
           setCheckingProfile(false);
         }
