@@ -841,15 +841,15 @@ function CameraWindow({
 
   const content = (
     <div
-      ref={windowRef}
-      className="absolute left-0 top-0 z-40 w-[min(340px,calc(100vw-2rem))] overflow-hidden border-4 border-black bg-[#f6bfd8] p-2 text-black shadow-[8px_8px_0_rgba(0,0,0,0.25)]"
-      style={
-        !canDrag
-          ? { transform: `translate(${defaultPosition.x}px, ${defaultPosition.y}px)` }
-          : undefined
-      }
+     ref={windowRef}
+className="absolute left-0 top-0 z-40 flex h-[300px] w-[min(340px,calc(100vw-2rem))] resize flex-col overflow-hidden border-4 border-black bg-[#f6bfd8] p-2 text-black shadow-[8px_8px_0_rgba(0,0,0,0.25)]"
+style={{
+  minWidth: 280,
+  minHeight: 200,
+  ...(!canDrag ? { transform: `translate(${defaultPosition.x}px, ${defaultPosition.y}px)` } : {}),
+}}
     >
-      <div className="session-camera-handle flex items-center justify-between gap-3 pb-2">
+      <div className="session-camera-handle flex shrink-0 items-center justify-between gap-3 pb-2">
         <div className="flex min-w-0 items-center gap-2 font-mono text-xl font-black">
           {canDrag && <Grip className="size-5 shrink-0" />}
           <span className="truncate">{title}</span>
@@ -865,8 +865,8 @@ function CameraWindow({
           </button>
         )}
       </div>
-      <div className="overflow-hidden border-4 border-black bg-black">
-        <div className="relative aspect-video min-h-[180px]">
+      <div className="min-h-0 flex-1 overflow-hidden border-4 border-black bg-black">
+        <div className="relative h-full min-h-[150px]">
           <video
             ref={ref}
             autoPlay
@@ -884,7 +884,7 @@ function CameraWindow({
         </div>
       </div>
       {controls && (
-        <div className="flex flex-wrap items-center gap-2 border-x-4 border-b-4 border-black bg-[#fff1dd] px-3 py-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-x-4 border-b-4 border-black bg-[#fff1dd] px-3 py-2">
           {controls}
         </div>
       )}

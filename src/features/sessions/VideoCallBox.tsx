@@ -78,9 +78,10 @@ export function VideoCallBox({ open, onOpenChange }: Props) {
     >
       <div
         ref={nodeRef}
-        className="absolute left-0 top-0 z-40 min-h-[360px] w-[430px] min-w-[300px] max-w-[calc(100vw-2rem)] border-4 border-black bg-[#f6bfd8] p-2 text-black shadow-[8px_8px_0_rgba(0,0,0,0.25)]"
+        className="absolute left-0 top-0 z-40 flex h-[360px] min-h-[300px] w-[430px] min-w-[300px] max-w-[calc(100vw-2rem)] resize overflow-hidden border-4 border-black bg-[#f6bfd8] p-2 text-black shadow-[8px_8px_0_rgba(0,0,0,0.25)]"
       >
-        <div className="video-drag-handle flex cursor-move items-center justify-end gap-2 pb-2">
+        <div className="flex min-h-0 flex-1 flex-col">
+        <div className="video-drag-handle flex shrink-0 cursor-move items-center justify-end gap-2 pb-2">
           <button
             className="flex size-8 items-center justify-center border-2 border-black bg-white text-xl font-bold leading-none"
             aria-label="Minimize camera"
@@ -104,7 +105,7 @@ export function VideoCallBox({ open, onOpenChange }: Props) {
           </button>
         </div>
 
-        <div className="border-4 border-black bg-white">
+        <div className="flex min-h-0 flex-1 flex-col border-4 border-black bg-white">
           <div className="flex items-center justify-between border-b-4 border-black bg-[#fff1dd] px-3 py-2 font-mono text-lg font-bold">
             <div className="flex gap-6">
               <span>File</span>
@@ -122,8 +123,15 @@ export function VideoCallBox({ open, onOpenChange }: Props) {
             </a>
           </div>
 
-          <div className="grid grid-cols-[1fr_34px] grid-rows-[1fr_34px] bg-[#f6d8e6]">
-            <div className="relative aspect-video min-h-[220px] bg-black" style={{ backgroundImage: `url(${sessionBackground})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+          <div className="flex min-h-0 flex-1 flex-col bg-[#f6d8e6]">
+            <div
+              className="relative min-h-[190px] flex-1 bg-black"
+              style={{
+                backgroundImage: `url(${sessionBackground})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }}
+            >
               <video
                 ref={videoRef}
                 muted
@@ -140,12 +148,7 @@ export function VideoCallBox({ open, onOpenChange }: Props) {
               )}
             </div>
 
-            <div className="flex flex-col items-center justify-between border-l-4 border-black bg-[#f6d8e6] py-3 font-mono text-xl font-bold">
-              <span>^</span>
-              <span>v</span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 border-t-4 border-black bg-[#f6d8e6] px-3 py-2">
+            <div className="flex shrink-0 flex-wrap items-center gap-2 border-t-4 border-black bg-[#f6d8e6] px-3 py-2">
               {active ? (
                 <Button onClick={stopCamera} className="bg-white text-black hover:bg-white/90">
                   <VideoOff className="size-4" />
@@ -161,6 +164,7 @@ export function VideoCallBox({ open, onOpenChange }: Props) {
             </div>
 
           </div>
+        </div>
         </div>
       </div>
     </Draggable>
