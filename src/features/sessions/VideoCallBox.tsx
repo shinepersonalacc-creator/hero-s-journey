@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import Draggable from "react-draggable";
 import { ExternalLink, Video, VideoOff, X } from "lucide-react";
 import { Button } from "../../components/ui/forms/button";
-import sessionBackground from "../../../images/Untitled design.png";
+
+const cameraOffPlaceholder = "/Image/camera-off-placeholder.svg";
 
 type Props = {
   open: boolean;
@@ -124,14 +125,7 @@ export function VideoCallBox({ open, onOpenChange }: Props) {
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col bg-[#f6d8e6]">
-            <div
-              className="relative min-h-[190px] flex-1 bg-black"
-              style={{
-                backgroundImage: `url(${sessionBackground})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
-            >
+            <div className="relative min-h-[190px] flex-1 bg-[#eadb80]">
               <video
                 ref={videoRef}
                 muted
@@ -141,10 +135,11 @@ export function VideoCallBox({ open, onOpenChange }: Props) {
               />
 
               {!active && (
-                <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-white/75">
-                  <VideoOff className="size-9" />
-                  <div className="text-sm font-semibold">Camera off</div>
-                </div>
+                <img
+                  src={cameraOffPlaceholder}
+                  alt="Camera off"
+                  className="h-full w-full object-cover"
+                />
               )}
             </div>
 

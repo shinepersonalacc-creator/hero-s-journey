@@ -5,6 +5,8 @@ import { supabase } from "@/services/supabase/supabase";
 import { Category, levelInfo, uid } from "@/services/storage/storage";
 import { SignalSchema, type SignalMessage } from "./signalSchema";
 
+const cameraOffPlaceholder = "/Image/camera-off-placeholder.svg";
+
 type Props = {
   sessionId: string;
   categories: Category[];
@@ -456,13 +458,22 @@ export function SessionRoomBoard({ sessionId, categories, localXP, hostUserId }:
     const peers = peersRef.current;
     const pendingIce = pendingIceRef.current;
 
-    return () => {
-      localStreamRef.current?.getTracks().forEach((track) => track.stop());
-      peers.forEach(({ peer }) => peer.close());
-      peers.clear();
-      pendingIce.clear();
-      void supabase.removeChannel(channel);
-    };
+   const handleVisibilityChange = () => {
+  if (!document.hidden) {
+    trackPresence();
+  }
+};
+
+document.addEventListener('visibilitychange', handleVisibilityChange);
+
+return () => {
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
+  localStreamRef.current?.getTracks().forEach((track) => track.stop());
+  peers.forEach(({ peer }) => peer.close());
+  peers.clear();
+  pendingIce.clear();
+  void supabase.removeChannel(channel);
+};
     // The realtime channel should only be recreated when the room identity changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, participantId]);
@@ -876,10 +887,11 @@ style={{
             style={videoRef ? { transform: "scaleX(-1)" } : undefined}
           />
           {!active && (
-            <div className="flex h-full flex-col items-center justify-center gap-2 text-white/75">
-              <VideoOff className="size-8" />
-              <div className="font-semibold">Camera off</div>
-            </div>
+            <img
+              src={cameraOffPlaceholder}
+              alt="Camera off"
+              className="h-full w-full object-cover"
+            />
           )}
         </div>
       </div>
