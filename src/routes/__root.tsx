@@ -1,3 +1,5 @@
+import { supabase } from "@/services/supabase/supabase";
+
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
 import {
@@ -110,6 +112,23 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && hash.includes('access_token')) {
+      supabase.auth.getSession().then(() => {
+        window.location.hash = '';
+      });
+    }
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <Outlet />
+    </QueryClientProvider>
+  );
+}
   const { queryClient } = Route.useRouteContext();
 
   return (
