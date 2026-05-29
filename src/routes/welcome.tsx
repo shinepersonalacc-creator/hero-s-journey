@@ -35,7 +35,7 @@ function Welcome() {
   const [displayName, setDisplayName] = useState("");
   const [profile, setProfile] = useState<{ gender?: string | null } | null>(null);
   const [signedIn, setSignedIn] = useState(false);
-  const [checkingProfile, setCheckingProfile] = useState(true);
+  const [checkingProfile, setCheckingProfile] = useState(false);
   const [showAimScreen, setShowAimScreen] = useState(false);
   const [showChapterIntro, setShowChapterIntro] = useState(false);
   const postSignInStorageKey = "ascend.postSignInSessionId";
@@ -93,7 +93,7 @@ function Welcome() {
     return <div className="min-h-screen" />;
   }
 
-  if (signedIn && (!displayName || !profile?.gender)) {
+  if (signedIn && (!displayName) {
     return (
       <DisplayNamePrompt
         onComplete={(savedDisplayName, gender) => {
