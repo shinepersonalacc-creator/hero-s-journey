@@ -21,6 +21,7 @@ import {
   Link,
   Pencil,
   Plus,
+  RotateCcw,
   Target,
   Trophy,
   Users,
@@ -54,6 +55,8 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
   const [creatingSession, setCreatingSession] = useState(false);
   const [chapterIntroLevel, setChapterIntroLevel] = useState<number | null>(null);
   const [levelUpLevel, setLevelUpLevel] = useState<number | null>(null);
+  const [resetPointsOpen, setResetPointsOpen] = useState(false);
+  const [pointsToReset, setPointsToReset] = useState("");
   const chapterTimer = useRef<number | null>(null);
 
   const today = todayKey();
@@ -189,6 +192,15 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
       return { ...s, totalPoints };
     });
 
+  const resetPoints = () => {
+    const amount = Math.max(0, Math.round(Number(pointsToReset)));
+    if (!amount) return;
+
+    setState((s) => ({ ...s, totalPoints: Math.max(0, s.totalPoints - amount) }));
+    setPointsToReset("");
+    setResetPointsOpen(false);
+  };
+
   const toggleCategoryVisibility = (id: string) =>
     setHiddenCategoryIds((ids) =>
       ids.includes(id) ? ids.filter((hiddenId) => hiddenId !== id) : [...ids, id],
@@ -208,13 +220,15 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
       className={`relative min-h-screen overflow-y-auto ${levelUpLevel ? "level-up-falling" : ""}`}
       style={stageBackground}
     >
-      <div className="fixed right-5 top-5 z-50 flex flex-wrap items-center justify-end gap-3">
+      <div className="fixed left-5 top-5 z-50">
         <a
           href={DISCORD_URL}
           className="inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-4 py-2 font-bold text-black shadow-sm transition hover:bg-black/5"
         >
           Leave us your feedback in Discord
         </a>
+      </div>
+      <div className="fixed right-5 top-5 z-50">
         <LogoutButton onLoggedOut={() => setState(emptyAppState)} />
       </div>
       <div className="mx-auto max-w-7xl px-6 py-10 md:py-14">
@@ -267,6 +281,14 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
                 aria-label="home"
               >
                 home
+              </button>
+              <button
+                type="button"
+                onClick={() => setResetPointsOpen(true)}
+                className="inline-flex h-11 items-center gap-2 rounded-full border-2 border-black bg-white px-4 font-bold text-black shadow-sm transition hover:bg-black/5"
+              >
+                <RotateCcw className="size-4" />
+                reset points
               </button>
               <AddCategoryDialog
                 onAdd={addCategory}
@@ -332,22 +354,25 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-6">
+          <div className="grid w-full max-w-[520px] grid-cols-1 items-center justify-items-center gap-4 sm:grid-cols-[140px_180px_140px] sm:justify-items-stretch lg:w-auto">
             <div
-              className="level-fall-item rounded-3xl border border-white/20 bg-black/30 p-4 text-white shadow-sm backdrop-blur"
+              className="level-fall-item flex min-h-28 w-full flex-col justify-center rounded-2xl border border-white/20 bg-black/30 p-4 text-white shadow-sm backdrop-blur"
               style={{ animationDelay: "350ms" }}
             >
               <div className="text-xs uppercase tracking-[0.35em] text-white/70">
                 Level {level}
               </div>
-              <div className="mt-3 text-4xl font-display font-bold text-white">
+              <div className="mt-3 font-display text-4xl font-bold text-white">
                 {neededXP} pts
               </div>
-              <div className="mt-1 text-sm uppercase tracking-[0.18em] text-white font-semibold">
+              <div className="mt-1 text-sm font-semibold uppercase tracking-[0.18em] text-white">
                 required
               </div>
             </div>
-            <div className="level-fall-item" style={{ animationDelay: "700ms" }}>
+            <div
+              className="level-fall-item flex justify-center"
+              style={{ animationDelay: "700ms" }}
+            >
               <ProgressRing
                 percent={percent}
                 label={`L${level}`}
@@ -355,9 +380,15 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
               />
             </div>
             <div
-              className="level-fall-item flex flex-col gap-3"
+              className="level-fall-item flex w-full flex-col gap-2"
               style={{ animationDelay: "1050ms" }}
             >
+              <Stat
+                icon={<Trophy className="size-4" />}
+                label="Total"
+                value={`${state.totalPoints}`}
+                sub="points"
+              />
               <Stat
                 icon={<Calendar className="size-4" />}
                 label="Today"
@@ -405,6 +436,57 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
         </section>
       </div>
       <VideoCallBox open={videoOpen} onOpenChange={setVideoOpen} />
+      {resetPointsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4">
+          <div className="w-full max-w-sm rounded-2xl border-2 border-black bg-white p-5 text-black shadow-xl">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-2xl font-bold">Reset points</h2>
+              <button
+                type="button"
+                onClick={() => setResetPointsOpen(false)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/10 text-xl font-bold hover:bg-black/20"
+                aria-label="Close reset points dialog"
+              >
+                X
+              </button>
+            </div>
+
+            <label className="mt-5 block text-sm font-bold uppercase tracking-widest text-black/70">
+              Points to remove
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              inputMode="numeric"
+              value={pointsToReset}
+              onChange={(event) => setPointsToReset(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && resetPoints()}
+              className="mt-2 h-12 w-full rounded-xl border-2 border-black bg-white px-4 text-base font-semibold text-black outline-none"
+              placeholder="0"
+              autoFocus
+            />
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setResetPointsOpen(false)}
+                className="rounded-full bg-black/10 px-5 py-2 font-semibold text-black hover:bg-black/15"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={resetPoints}
+                disabled={!Number(pointsToReset)}
+                className="rounded-full bg-black px-5 py-2 font-semibold text-white hover:bg-black/85 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {sessionDialogOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4">
           <div className="w-full max-w-md rounded-2xl border-2 border-black bg-white p-5 text-black shadow-xl">
@@ -621,18 +703,18 @@ function Stat({
   sub: string;
 }) {
   return (
-    <div className="rounded-xl border border-white/20 bg-black/30 px-4 py-3 text-white shadow-sm backdrop-blur">
-      <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-white/80">
+    <div className="rounded-xl border border-white/20 bg-black/30 px-3 py-2 text-white shadow-sm backdrop-blur">
+      <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/80">
         {icon} {label}
       </div>
       <div
-        className="mt-1 text-2xl font-bold text-white"
+        className="mt-0.5 text-xl font-bold text-white"
         style={{ fontFamily: '"Roboto Mono", monospace' }}
       >
         {value}
       </div>
       <div
-        className="text-lg font-semibold text-white/90"
+        className="text-base font-semibold text-white/90"
         style={{ fontFamily: '"Roboto Mono", monospace' }}
       >
         {sub}
