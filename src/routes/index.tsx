@@ -156,8 +156,11 @@ function Index() {
     }));
   }, [setState, shouldResumeDashboard, state.draftGoal]);
 
-  if (!hydrated || checkingProfile) return <div className="min-h-screen" />;
-
+if (!hydrated || checkingProfile) return (
+  <div className="min-h-screen flex items-center justify-center bg-white">
+    <div className="text-2xl font-black animate-pulse">Loading your journey...</div>
+  </div>
+);
   if (needsProfile) {
     return (
       <DisplayNamePrompt
