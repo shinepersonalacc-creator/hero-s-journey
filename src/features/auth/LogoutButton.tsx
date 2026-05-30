@@ -8,18 +8,17 @@ export function LogoutButton({ onLoggedOut }: { onLoggedOut?: () => void }) {
   const router = useRouter();
 
   const handleLogout = async () => {
-    setLoading(true);
-    try {
-      await supabase.auth.signOut();
-      onLoggedOut?.();
-    } catch (error) {
-      console.error("Logout failed:", error);
-    } finally {
-      setLoading(false);
-      void router.navigate({ to: "/" });
-    }
-  };
-
+  setLoading(true);
+  onLoggedOut?.();
+  void router.navigate({ to: "/" });
+  try {
+    await supabase.auth.signOut();
+  } catch (error) {
+    console.error("Logout failed:", error);
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <button
       type="button"
