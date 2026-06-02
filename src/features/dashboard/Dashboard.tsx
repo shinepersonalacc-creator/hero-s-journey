@@ -47,6 +47,7 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
   const [draft, setDraft] = useState(state.goal);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [hiddenCategoryIds, setHiddenCategoryIds] = useState<string[]>([]);
+  const [visibilityFocusMode, setVisibilityFocusMode] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
   const [sessionName, setSessionName] = useState("");
@@ -206,6 +207,16 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
       ids.includes(id) ? ids.filter((hiddenId) => hiddenId !== id) : [...ids, id],
     );
 
+  const openVisibilityControls = (open: boolean) => {
+    setVisibilityFocusMode(true);
+    setCategoryPickerOpen(open);
+  };
+
+  const exitVisibilityFocus = () => {
+    setVisibilityFocusMode(false);
+    setCategoryPickerOpen(false);
+  };
+
   if (chapterIntroLevel) {
     return (
       <ChapterIntro
@@ -220,20 +231,45 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
       className={`relative min-h-screen overflow-y-auto ${levelUpLevel ? "level-up-falling" : ""}`}
       style={stageBackground}
     >
-      <div className="fixed left-5 top-5 z-50">
-        <a
-          href={DISCORD_URL}
-          className="inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-4 py-2 font-bold text-black shadow-sm transition hover:bg-black/5"
-        >
-          Leave us your feedback in Discord
-        </a>
-      </div>
-      <div className="fixed right-5 top-5 z-50">
-        <LogoutButton onLoggedOut={() => setState(emptyAppState)} />
-      </div>
+      {!visibilityFocusMode && (
+        <div className="fixed left-5 top-5 z-50">
+          <a
+            href={DISCORD_URL}
+            className="inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-4 py-2 font-bold text-black shadow-sm transition hover:bg-black/5"
+          >
+            Leave us your feedback in Discord
+          </a>
+        </div>
+      )}
+      {!visibilityFocusMode && (
+        <div className="fixed right-5 top-5 z-50">
+          <LogoutButton onLoggedOut={() => setState(emptyAppState)} />
+        </div>
+      )}
+      {visibilityFocusMode && (
+        <div className="fixed left-5 top-5 z-50 flex flex-wrap gap-2">
+          <CategoryVisibilityPicker
+            categories={state.categories}
+            hiddenCategoryIds={hiddenCategoryIds}
+            open={categoryPickerOpen}
+            onOpenChange={openVisibilityControls}
+            onToggleCategory={toggleCategoryVisibility}
+            onShowAll={() => setHiddenCategoryIds([])}
+            onExitFocus={exitVisibilityFocus}
+          />
+          <button
+            onClick={() => setVideoOpen(true)}
+            className="inline-flex h-11 items-center justify-center rounded-full border-2 border-black bg-white px-4 font-bold text-black shadow-sm transition hover:bg-black/5"
+            aria-label="camera"
+          >
+            camera
+          </button>
+        </div>
+      )}
       <div className="mx-auto max-w-7xl px-6 py-10 md:py-14">
-        <header className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-          <div className="level-fall-item flex-1" style={{ animationDelay: "0ms" }}>
+        {!visibilityFocusMode && (
+          <header className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+            <div className="level-fall-item flex-1" style={{ animationDelay: "0ms" }}>
             <div className="mt-3 inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-4 py-2 text-base md:text-lg font-bold uppercase tracking-[0.18em] text-black shadow-sm">
               <Target className="size-3" /> {chapter.label}
             </div>
@@ -257,16 +293,16 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
                 categories={state.categories}
                 hiddenCategoryIds={hiddenCategoryIds}
                 open={categoryPickerOpen}
-                onOpenChange={setCategoryPickerOpen}
+                onOpenChange={openVisibilityControls}
                 onToggleCategory={toggleCategoryVisibility}
                 onShowAll={() => setHiddenCategoryIds([])}
               />
               <button
                 onClick={() => setVideoOpen(true)}
                 className="inline-flex h-11 items-center justify-center rounded-full border-2 border-black bg-white px-4 font-bold text-black shadow-sm transition hover:bg-black/5"
-                aria-label="video"
+                aria-label="camera"
               >
-                video
+                camera
               </button>
               <button
                 onClick={() => setSessionDialogOpen(true)}
@@ -352,9 +388,9 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
                 <Pencil className="mt-1 size-5 shrink-0 text-black/60 opacity-0 transition group-hover:opacity-100" />
               </button>
             )}
-          </div>
+            </div>
 
-          <div className="grid w-full max-w-[520px] grid-cols-1 items-center justify-items-center gap-4 sm:grid-cols-[140px_180px_140px] sm:justify-items-stretch lg:w-auto">
+            <div className="grid w-full max-w-[520px] grid-cols-1 items-center justify-items-center gap-4 sm:grid-cols-[140px_180px_140px] sm:justify-items-stretch lg:w-auto">
             <div
               className="level-fall-item flex min-h-28 w-full flex-col justify-center rounded-2xl border border-white/20 bg-black/30 p-4 text-white shadow-sm backdrop-blur"
               style={{ animationDelay: "350ms" }}
@@ -402,19 +438,22 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
                 sub="points"
               />
             </div>
-          </div>
-        </header>
+            </div>
+          </header>
+        )}
 
-        <section className="mt-12">
-          <div
-            className="level-fall-item mb-5 flex items-baseline justify-between"
-            style={{ animationDelay: "1250ms" }}
-          >
-            <h2 className="font-display text-2xl font-semibold">Categories</h2>
-            <span className="text-sm text-white/70">
-              {visibleCategories.length}/{state.categories.length} visible
-            </span>
-          </div>
+        <section className={visibilityFocusMode ? "pt-20" : "mt-12"}>
+          {!visibilityFocusMode && (
+            <div
+              className="level-fall-item mb-5 flex items-baseline justify-between"
+              style={{ animationDelay: "1250ms" }}
+            >
+              <h2 className="font-display text-2xl font-semibold">Categories</h2>
+              <span className="text-sm text-white/70">
+                {visibleCategories.length}/{state.categories.length} visible
+              </span>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
             {visibleCategories.map((c, index) => (
@@ -631,6 +670,7 @@ function CategoryVisibilityPicker({
   onOpenChange,
   onToggleCategory,
   onShowAll,
+  onExitFocus,
 }: {
   categories: Category[];
   hiddenCategoryIds: string[];
@@ -638,6 +678,7 @@ function CategoryVisibilityPicker({
   onOpenChange: (open: boolean) => void;
   onToggleCategory: (id: string) => void;
   onShowAll: () => void;
+  onExitFocus?: () => void;
 }) {
   return (
     <div className="relative">
@@ -663,6 +704,15 @@ function CategoryVisibilityPicker({
               Show all
             </button>
           </div>
+          {onExitFocus && (
+            <button
+              type="button"
+              onClick={onExitFocus}
+              className="mb-3 w-full rounded-xl bg-black px-3 py-2 text-sm font-bold text-white transition hover:bg-black/85"
+            >
+              Show dashboard
+            </button>
+          )}
 
           <div className="grid gap-2">
             {categories.map((category) => {
