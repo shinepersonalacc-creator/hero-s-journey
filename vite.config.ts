@@ -7,20 +7,20 @@
 process.env.WRANGLER_WRITE_LOGS ??= "false";
 
 const { defineConfig } = await import("@lovable.dev/vite-tanstack-config");
+const plugins: any[] = [];
 const isVercelBuild = process.env.VERCEL === "1";
-const plugins = [];
 
 if (isVercelBuild) {
   const { nitro } = await import("nitro/vite");
   plugins.push(nitro({ preset: "vercel" }));
 }
 
-// Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-// @cloudflare/vite-plugin builds from this — wrangler.jsonc main alone is insufficient.
 export default defineConfig({
-  cloudflare: isVercelBuild ? false : undefined,
+  cloudflare: false,
   plugins,
   tanstackStart: {
-    server: { entry: "server" },
+    start: { entry: "app/start" },
+    server: { entry: "app/server" },
+    router: { entry: "app/router" },
   },
 });

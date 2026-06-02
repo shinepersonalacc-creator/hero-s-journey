@@ -1,0 +1,156 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* @custom-variant dark (&:is(.dark *)); */
+
+@font-face {
+  font-family: "UntoldStory";
+  src: url("./fonts/The Untold Story Regular/UntoldStory.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-sans: "UntoldStory", system-ui, sans-serif;
+  --font-display: "UntoldStory", system-ui, sans-serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-mint: var(--mint);
+  --color-mint-bright: var(--mint-bright);
+  --color-forest: var(--forest);
+}
+
+:root {
+  --radius: 0.875rem;
+
+  /* Neon Mint palette */
+  --background: oklch(100% 0.00011 271.152);
+  --foreground: oklch(100% 0.00011 271.152);
+
+  --card: oklch(11.492% 0.00001 271.152);
+  --card-foreground: oklch(0.96 0.02 160);
+
+  --popover: oklch(0.22 0.045 220);
+  --popover-foreground: oklch(0.96 0.02 160);
+
+  --primary: oklch(98.809% 0.00011 271.152);
+  --primary-foreground: oklch(0.18 0.04 230);
+
+  --secondary: oklch(0.32 0.06 200);
+  --secondary-foreground: oklch(0.96 0.02 160);
+
+  --muted: oklch(0.26 0.04 220);
+  --muted-foreground: oklch(0.7 0.03 200);
+
+  --accent: oklch(60.918% 0.24999 29.223);
+  --accent-foreground: oklch(0.18 0.04 230);
+
+  --destructive: oklch(0.65 0.22 22);
+  --destructive-foreground: oklch(0.98 0 0);
+
+  --border: oklch(0.3 0.04 220);
+  --input: oklch(0.28 0.04 220);
+  --ring: oklch(60.009% 0.21486 8.96);
+
+  --mint: oklch(81.778% 0.16705 100.635
+  );
+  --mint-bright: oklch(81.778% 0.16705 100.635);
+  --forest: oklch(0.35 0.08 160);
+
+  --gradient-hero: radial-gradient(circle at 20% 0%, oklch(22.643% 0.01284 160.248 / 0.6), transparent 50%),
+                   radial-gradient(circle at 80% 100%, oklch(0% 0 0 / 0.25), transparent 50%);
+  --gradient-mint: linear-gradient(135deg, oklch(0% 0 0), oklch(0% 0 0));
+  --gradient-gold: linear-gradient(135deg, oklch(10.668% 0.00001 271.152), oklch(0% 0 0));
+  --shadow-glow: 0 0 60px -10px oklch(22.241% 0.02507 173.14 / 0.5);
+  --shadow-card: 0 8px 32px -12px oklch(0.1 0.04 230 / 0.6);
+}
+
+.dark { color-scheme: dark; }
+
+@layer base {
+  * { border-color: var(--color-border); }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    background-image:  linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0)),
+    url("/Image/adventurebg.png");
+    background-size: cover;
+background-position: center;
+background-repeat: no-repeat;
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+  h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.02em; }
+}
+
+@layer utilities {
+  .text-gradient-gold {
+    background: var(--gradient-gold);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  .glow-gold { box-shadow: var(--shadow-glow); }
+  .card-elevated { box-shadow: var(--shadow-card); }
+  .text-outline-black {
+    color: white;
+    -webkit-text-stroke: 1px black;
+    text-stroke: 1px black;
+  }
+
+  .level-up-falling .level-fall-item {
+    animation: level-fall-away 1350ms cubic-bezier(0.68, 0, 0.86, 0.6) forwards;
+    transform-origin: center bottom;
+    will-change: transform, opacity;
+  }
+}
+
+@keyframes level-fall-away {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+  20% {
+    transform: translateY(-12px) rotate(-1deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(115vh) rotate(8deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .level-up-falling .level-fall-item {
+    animation-duration: 1ms;
+    animation-delay: 0ms !important;
+  }
+}
