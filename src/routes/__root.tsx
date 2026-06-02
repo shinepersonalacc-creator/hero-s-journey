@@ -1,5 +1,3 @@
-import { supabase } from "@/services/supabase/supabase";
-
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
 import {
@@ -10,6 +8,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { supabase } from "@/services/supabase/supabase";
 
 import appCss from "../styles.css?url";
 
@@ -122,14 +121,6 @@ function RootComponent() {
       });
     }
   }, []);
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <Outlet />
-    </QueryClientProvider>
-  );
-}
-  const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>

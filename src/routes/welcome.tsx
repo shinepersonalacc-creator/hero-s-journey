@@ -93,7 +93,7 @@ function Welcome() {
     return <div className="min-h-screen" />;
   }
 
-  if (signedIn && (!displayName) {
+  if (signedIn && !displayName) {
     return (
       <DisplayNamePrompt
         onComplete={(savedDisplayName, gender) => {
