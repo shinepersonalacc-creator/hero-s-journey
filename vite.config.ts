@@ -12,7 +12,14 @@ const isVercelBuild = process.env.VERCEL === "1";
 
 if (isVercelBuild) {
   const { nitro } = await import("nitro/vite");
-  plugins.push(nitro({ preset: "vercel" }));
+  plugins.push(
+    nitro({
+      preset: "vercel",
+      vercel: {
+        functions: { runtime: "nodejs22.x" },
+      },
+    }),
+  );
 }
 
 export default defineConfig({
