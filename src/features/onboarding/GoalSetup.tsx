@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/forms/button";
+import { Textarea } from "@/components/ui/forms/textarea";
 import { supabase } from "@/services/supabase/supabase";
 import { getSiteUrl } from "@/lib/site";
 import { LogoutButton } from "@/features/auth/LogoutButton";
@@ -108,6 +109,27 @@ export function GoalSetup({
 
         {signedIn && (
           <>
+            <div className="mt-6">
+              <p
+                className="mb-2 text-center text-base font-bold text-white"
+                style={{ fontFamily: '"Roboto Mono", monospace' }}
+              >
+                Where do you see yourself at the end of this journey?
+              </p>
+              <Textarea
+                value={val}
+                onChange={(e) => {
+                  setVal(e.target.value);
+                  onDraftChange?.(e.target.value);
+                }}
+                placeholder="Describe your vision..."
+                rows={3}
+                disabled={hasStartedJourney}
+                className="w-full resize-none rounded-2xl border-2 border-black bg-white px-4 py-3 text-base font-semibold text-black placeholder:text-black/40 focus-visible:ring-0 disabled:opacity-60"
+                style={{ fontFamily: '"Roboto Mono", monospace' }}
+              />
+            </div>
+
             {hasStartedJourney ? (
               <div className="mt-6 rounded-3xl bg-black p-4 text-center shadow-xl">
                 <p

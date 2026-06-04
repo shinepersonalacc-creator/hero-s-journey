@@ -1,6 +1,19 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import Draggable from "react-draggable";
-import { Camera, CameraOff, Check, Grip, Maximize2, Video, VideoOff, X } from "lucide-react";
+import {
+  Camera,
+  CameraOff,
+  Check,
+  Eraser,
+  Grip,
+  ImagePlus,
+  Layers,
+  Maximize2,
+  Upload,
+  Video,
+  VideoOff,
+  X,
+} from "lucide-react";
 import { supabase } from "@/services/supabase/supabase";
 import { Category, levelInfo, uid } from "@/services/storage/storage";
 import { SignalSchema, type SignalMessage } from "./signalSchema";
@@ -47,6 +60,16 @@ type PeerContext = {
   ignoreOffer: boolean;
   isSettingRemoteAnswerPending: boolean;
   polite: boolean;
+};
+
+type CustomImageLayer = "below" | "top";
+
+type CustomImageAsset = {
+  id: string;
+  name: string;
+  src: string;
+  layer: CustomImageLayer;
+  position: { x: number; y: number };
 };
 
 const participantStorageKey = "ascend.session.participant";
@@ -96,6 +119,7 @@ function summarizePresence(state: Record<string, ParticipantPresence[]>) {
 export function SessionRoomBoard({ sessionId, categories, localXP, hostUserId }: Props) {
   const participantId = useMemo(getParticipantId, []);
   const joinedAtRef = useRef(Date.now());
+  const customImageInputRef = useRef<HTMLInputElement>(null);
   const localCameraNodeRef = useRef<HTMLDivElement>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -114,6 +138,10 @@ export function SessionRoomBoard({ sessionId, categories, localXP, hostUserId }:
   const [displayName, setDisplayName] = useState("Session guest");
   const [userId, setUserId] = useState<string | null>(null);
   const [cardPositions, setCardPositions] = useState<Record<string, { x: number; y: number }>>({});
+  const [customToolsOpen, setCustomToolsOpen] = useState(false);
+  const [customImage, setCustomImage] = useState<CustomImageAsset | null>(null);
+  const [customImageError, setCustomImageError] = useState("");
+  const [removingCustomBg, setRemovingCustomBg] = useState(false);
 
   const selectedCategory = useMemo(
     () =>
@@ -563,10 +591,66 @@ return () => {
     setCameraError("");
   };
 
+  const handleCustomImageUpload = async (file?: File | null) => {
+    setCustomImageError("");
+    if (!file) return;
+
+    if (!["image/jpeg", "image/png"].includes(file.type)) {
+      setCustomImageError("Upload a JPG or PNG image.");
+      return;
+    }
+
+    try {
+      const src = await readFileAsDataUrl(file);
+      setCustomImage({
+        id: uid(),
+        name: file.name,
+        src,
+        layer: customImage?.layer ?? "top",
+        position: customImage?.position ?? { x: 24, y: 120 },
+      });
+    } catch (error) {
+      setCustomImageError(error instanceof Error ? error.message : "Could not load that image.");
+    } finally {
+      if (customImageInputRef.current) customImageInputRef.current.value = "";
+    }
+  };
+
+  const removeCustomImageBackground = async () => {
+    if (!customImage) {
+      setCustomImageError("Upload an image first.");
+      return;
+    }
+
+    setRemovingCustomBg(true);
+    setCustomImageError("");
+
+    try {
+      const src = await removeBackgroundFromImage(customImage.src);
+      setCustomImage((current) => (current ? { ...current, src } : current));
+    } catch (error) {
+      setCustomImageError(
+        error instanceof Error ? error.message : "Could not remove the background.",
+      );
+    } finally {
+      setRemovingCustomBg(false);
+    }
+  };
+
   const displayedParticipants = participants.filter((participant) => participant.category);
 
   return (
-    <div className="mt-8">
+    <div className="relative mt-8 min-h-[720px]">
+      {customImage && (
+        <CustomImageObject
+          image={customImage}
+          onMove={(position) => {
+            setCustomImage((current) => (current ? { ...current, position } : current));
+          }}
+          onRemove={() => setCustomImage(null)}
+        />
+      )}
+
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border-2 border-black bg-white p-4 text-black shadow-xl">
         <label className="flex min-w-[220px] flex-1 flex-col gap-1 font-bold">
           <span className="text-xs uppercase tracking-[0.2em] text-black/60">
@@ -602,7 +686,80 @@ return () => {
           <Maximize2 className="size-4" />
           Camera window
         </button>
+
+        <button
+          type="button"
+          onClick={() => setCustomToolsOpen((open) => !open)}
+          className="inline-flex h-11 items-center gap-2 rounded-xl border-2 border-black bg-[#f7e35b] px-4 font-bold text-black hover:bg-[#ffe95f]"
+        >
+          <ImagePlus className="size-4" />
+          Custom
+        </button>
       </div>
+
+      {customToolsOpen && (
+        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border-2 border-black bg-[#fff1dd] p-4 text-black shadow-xl">
+          <input
+            ref={customImageInputRef}
+            type="file"
+            accept="image/png,image/jpeg"
+            className="hidden"
+            onChange={(event) => void handleCustomImageUpload(event.target.files?.[0])}
+          />
+
+          <button
+            type="button"
+            onClick={() => customImageInputRef.current?.click()}
+            className="inline-flex h-11 items-center gap-2 rounded-xl bg-black px-4 font-bold text-white hover:bg-black/85"
+          >
+            <Upload className="size-4" />
+            Upload image
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void removeCustomImageBackground()}
+            disabled={!customImage || removingCustomBg}
+            className="inline-flex h-11 items-center gap-2 rounded-xl border-2 border-black bg-white px-4 font-bold text-black hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <Eraser className="size-4" />
+            {removingCustomBg ? "Removing..." : "Remove bg"}
+          </button>
+
+          <div className="inline-flex h-11 overflow-hidden rounded-xl border-2 border-black bg-white font-bold">
+            <button
+              type="button"
+              onClick={() =>
+                setCustomImage((current) => (current ? { ...current, layer: "below" } : current))
+              }
+              className={`inline-flex items-center gap-2 px-4 ${
+                customImage?.layer === "below" ? "bg-black text-white" : "text-black"
+              }`}
+            >
+              <Layers className="size-4" />
+              Below
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setCustomImage((current) => (current ? { ...current, layer: "top" } : current))
+              }
+              className={`border-l-2 border-black px-4 ${
+                customImage?.layer !== "below" ? "bg-black text-white" : "text-black"
+              }`}
+            >
+              Top
+            </button>
+          </div>
+
+          {customImage && (
+            <div className="min-w-0 flex-1 truncate font-semibold text-black/70">
+              {customImage.name}
+            </div>
+          )}
+          {customImageError && <div className="font-semibold text-red-700">{customImageError}</div>}
+        </div>
+      )}
 
       {!categories.length && (
         <div className="mt-4 rounded-xl bg-black px-4 py-3 font-semibold text-white">
@@ -803,6 +960,51 @@ function ParticipantCategoryCard({
   );
 }
 
+function CustomImageObject({
+  image,
+  onMove,
+  onRemove,
+}: {
+  image: CustomImageAsset;
+  onMove: (position: { x: number; y: number }) => void;
+  onRemove: () => void;
+}) {
+  const nodeRef = useRef<HTMLDivElement>(null);
+  const zIndex = image.layer === "top" ? 60 : 1;
+
+  return (
+    <Draggable
+      nodeRef={nodeRef}
+      position={image.position}
+      onStop={(_, data) => onMove({ x: data.x, y: data.y })}
+      cancel="button"
+    >
+      <div
+        ref={nodeRef}
+        className="absolute left-0 top-0 w-[min(280px,calc(100vw-2rem))] cursor-grab active:cursor-grabbing"
+        style={{ zIndex }}
+      >
+        <div className="group relative">
+          <img
+            src={image.src}
+            alt={image.name}
+            className="max-h-[320px] w-full object-contain drop-shadow-[6px_6px_0_rgba(0,0,0,0.22)]"
+            draggable={false}
+          />
+          <button
+            type="button"
+            onClick={onRemove}
+            className="absolute right-0 top-0 hidden size-8 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-black bg-white text-black shadow-md group-hover:flex"
+            aria-label={`Remove ${image.name}`}
+          >
+            <X className="size-4" strokeWidth={4} />
+          </button>
+        </div>
+      </div>
+    </Draggable>
+  );
+}
+
 function CameraWindow({
   title,
   stream,
@@ -931,4 +1133,103 @@ function isInterruptedPlayError(error: unknown) {
   if (!(error instanceof DOMException)) return false;
 
   return error.name === "AbortError" || error.message.includes("interrupted");
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("Could not read that image."));
+    };
+    reader.onerror = () => reject(new Error("Could not read that image."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Could not process that image."));
+    image.src = src;
+  });
+}
+
+async function removeBackgroundFromImage(src: string) {
+  const image = await loadImage(src);
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) throw new Error("Background removal is not available in this browser.");
+
+  canvas.width = image.naturalWidth;
+  canvas.height = image.naturalHeight;
+  context.drawImage(image, 0, 0);
+
+  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  const background = sampleCornerColor(data, canvas.width, canvas.height);
+  const tolerance = 72;
+  const softEdge = 28;
+
+  for (let index = 0; index < data.length; index += 4) {
+    const distance = colorDistance(
+      data[index],
+      data[index + 1],
+      data[index + 2],
+      background.r,
+      background.g,
+      background.b,
+    );
+
+    if (distance <= tolerance) {
+      data[index + 3] = 0;
+    } else if (distance <= tolerance + softEdge) {
+      const alphaRatio = (distance - tolerance) / softEdge;
+      data[index + 3] = Math.round(data[index + 3] * alphaRatio);
+    }
+  }
+
+  context.putImageData(imageData, 0, 0);
+  return canvas.toDataURL("image/png");
+}
+
+function sampleCornerColor(data: Uint8ClampedArray, width: number, height: number) {
+  const points = [
+    { x: 0, y: 0 },
+    { x: width - 1, y: 0 },
+    { x: 0, y: height - 1 },
+    { x: width - 1, y: height - 1 },
+  ];
+
+  const totals = points.reduce(
+    (acc, point) => {
+      const index = (point.y * width + point.x) * 4;
+      return {
+        r: acc.r + data[index],
+        g: acc.g + data[index + 1],
+        b: acc.b + data[index + 2],
+      };
+    },
+    { r: 0, g: 0, b: 0 },
+  );
+
+  return {
+    r: totals.r / points.length,
+    g: totals.g / points.length,
+    b: totals.b / points.length,
+  };
+}
+
+function colorDistance(
+  redA: number,
+  greenA: number,
+  blueA: number,
+  redB: number,
+  greenB: number,
+  blueB: number,
+) {
+  return Math.sqrt(
+    (redA - redB) ** 2 + (greenA - greenB) ** 2 + (blueA - blueB) ** 2,
+  );
 }

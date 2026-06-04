@@ -56,7 +56,7 @@ export function VideoCallBox({ open, onOpenChange }: Props) {
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        
       }
 
       setActive(true);
@@ -129,6 +129,7 @@ export function VideoCallBox({ open, onOpenChange }: Props) {
               <video
                 ref={videoRef}
                 muted
+                autoPlay
                 playsInline
                 className={`h-full w-full object-cover ${active ? "block" : "hidden"}`}
                 style={{ transform: "scaleX(-1)" }}

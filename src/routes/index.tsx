@@ -52,73 +52,73 @@ function Index() {
     router.navigate({ to: "/session/$sessionId", params: { sessionId: redirectSessionId } });
   }, [router]);
 
-  useEffect(() => {
-    if (!hydrated) return;
-
+  const syncCloudXP = async () => {
     let cancelled = false;
 
-    const syncCloudXP = async () => {
-      setCheckingProfile(true);
+    setCheckingProfile(true);
 
-      const timeout = setTimeout(() => {
-        if (!cancelled) setCheckingProfile(false);
-      }, 5000);
+    const timeout = setTimeout(() => {
+      if (!cancelled) setCheckingProfile(false);
+    }, 5000);
 
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        const user = session?.user ?? null;
-        const profile = user ? await ensureUserProfile() : null;
-        const cloudXP = user ? await loadUserXP() : null;
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
+      const profile = user ? await ensureUserProfile() : null;
+      const cloudXP = user ? await loadUserXP() : null;
 
-        if (cancelled) return;
+      if (cancelled) return;
 
-        setSignedIn(Boolean(user));
-        setDisplayName(user ? getDisplayNameFromMetadata(user.user_metadata) : "");
-        setCloudOnboardingComplete(
-          user ? hasCompletedOnboardingFromMetadata(user.user_metadata) : false,
-        );
-        setProfile(profile);
+      setSignedIn(Boolean(user));
+      setDisplayName(user ? getDisplayNameFromMetadata(user.user_metadata) : "");
+      setCloudOnboardingComplete(
+        user ? hasCompletedOnboardingFromMetadata(user.user_metadata) : false,
+      );
+      setProfile(profile);
 
-        if (cloudXP) setState((current) => ({ ...current, totalPoints: cloudXP.xp }));
-      } catch (error) {
-        console.error("Could not sync auth state:", error);
+      if (cloudXP) setState((current) => ({ ...current, totalPoints: cloudXP.xp }));
+    } catch (error) {
+      console.error("Could not sync auth state:", error);
 
-        if (!cancelled) {
-          setSignedIn(false);
-          setDisplayName("");
-          setCloudOnboardingComplete(false);
-          setProfile(null);
-        }
-      } finally {
-        clearTimeout(timeout);
-        if (!cancelled) {
-          setCheckingProfile(false);
-        }
+      if (!cancelled) {
+        setSignedIn(false);
+        setDisplayName("");
+        setCloudOnboardingComplete(false);
+        setProfile(null);
       }
-    };
+    } finally {
+      clearTimeout(timeout);
+      if (!cancelled) {
+        setCheckingProfile(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!hydrated) return;
 
     syncCloudXP();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setSignedIn(Boolean(session));
-      setDisplayName(
-        session ? getDisplayNameFromMetadata(session.user.user_metadata) : ""
-      );
-      setCloudOnboardingComplete(
-        session ? hasCompletedOnboardingFromMetadata(session.user.user_metadata) : false,
-      );
-
-      if (event === "SIGNED_IN") {
-        await syncCloudXP();
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Just update sign-in state; the syncCloudXP effect will re-run
+      // via the hydrated dependency when the session changes.
+      if (!session) {
+        setSignedIn(false);
+        setDisplayName("");
+        setCloudOnboardingComplete(false);
+        setProfile(null);
+        setCheckingProfile(false);
+      } else {
+        // Trigger a fresh sync by re-running syncCloudXP directly
+        syncCloudXP();
       }
     });
 
     return () => {
-      cancelled = true;
       subscription.unsubscribe();
     };
   }, [hydrated, setState]);
