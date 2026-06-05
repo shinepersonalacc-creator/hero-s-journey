@@ -7,7 +7,7 @@ values ('user-files', 'user-files', false)
 on conflict (id) do update set public = false;
 
 drop policy if exists "Users can read their own private files" on storage.objects;
-create policy "Users can read their own private files"
+create policy if not exists "Users can read their own private files"
   on storage.objects
   for select
   to authenticated
@@ -17,7 +17,7 @@ create policy "Users can read their own private files"
   );
 
 drop policy if exists "Users can upload their own private files" on storage.objects;
-create policy "Users can upload their own private files"
+create policy if not exists "Users can upload their own private files"
   on storage.objects
   for insert
   to authenticated
@@ -27,7 +27,7 @@ create policy "Users can upload their own private files"
   );
 
 drop policy if exists "Users can update their own private files" on storage.objects;
-create policy "Users can update their own private files"
+create policy if not exists "Users can update their own private files"
   on storage.objects
   for update
   to authenticated
@@ -41,7 +41,7 @@ create policy "Users can update their own private files"
   );
 
 drop policy if exists "Users can delete their own private files" on storage.objects;
-create policy "Users can delete their own private files"
+create policy if not exists "Users can delete their own private files"
   on storage.objects
   for delete
   to authenticated

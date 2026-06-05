@@ -27,57 +27,57 @@ alter table public.profiles enable row level security;
 alter table public.sessions enable row level security;
 alter table public.session_tasks enable row level security;
 
-create policy "Users can read their own profile"
+create policy if not exists "Users can read their own profile"
   on public.profiles
   for select
   to authenticated
   using (auth.uid() = id);
 
-create policy "Users can insert their own profile"
+create policy if not exists "Users can insert their own profile"
   on public.profiles
   for insert
   to authenticated
   with check (auth.uid() = id);
 
-create policy "Users can update their own profile"
+create policy if not exists "Users can update their own profile"
   on public.profiles
   for update
   to authenticated
   using (auth.uid() = id)
   with check (auth.uid() = id);
 
-create policy "Authenticated users can create sessions"
+create policy if not exists "Authenticated users can create sessions"
   on public.sessions
   for insert
   to authenticated
   with check (auth.uid() = created_by);
 
-create policy "Anyone can read sessions"
+create policy if not exists "Anyone can read sessions"
   on public.sessions
   for select
   to anon, authenticated
   using (true);
 
-create policy "Users can read their own session tasks"
+create policy if not exists "Users can read their own session tasks"
   on public.session_tasks
   for select
   to authenticated
   using (auth.uid() = user_id);
 
-create policy "Users can create their own session tasks"
+create policy if not exists "Users can create their own session tasks"
   on public.session_tasks
   for insert
   to authenticated
   with check (auth.uid() = user_id);
 
-create policy "Users can update their own session tasks"
+create policy if not exists "Users can update their own session tasks"
   on public.session_tasks
   for update
   to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-create policy "Users can delete their own session tasks"
+create policy if not exists "Users can delete their own session tasks"
   on public.session_tasks
   for delete
   to authenticated

@@ -11,21 +11,26 @@ import { ProgressRing } from "../../components/ui/display/ProgressRing";
 import { CategoryCard } from "../goals/CategoryCard";
 import { AddCategoryDialog } from "../goals/AddCategoryDialog";
 import { VideoCallBox } from "../sessions/VideoCallBox";
+import Draggable from "react-draggable";
 import {
   ArrowLeft,
   ArrowRight,
   Calendar,
   Check,
+  Eraser,
   Eye,
   Home,
+  ImagePlus,
   Link,
   Pencil,
   Plus,
   RotateCcw,
   Target,
   Trophy,
+  Upload,
   Users,
   Video,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
@@ -41,14 +46,26 @@ type Props = {
   displayName?: string;
 };
 
+type CustomWorkspaceImage = {
+  id: string;
+  name: string;
+  src: string;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+};
+
 export function Dashboard({ state, setState, displayName = "" }: Props) {
   const router = useRouter();
+  const customImageInputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(state.goal);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [hiddenCategoryIds, setHiddenCategoryIds] = useState<string[]>([]);
   const [visibilityFocusMode, setVisibilityFocusMode] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
+  const [customImages, setCustomImages] = useState<CustomWorkspaceImage[]>([]);
+  const [customImageError, setCustomImageError] = useState("");
+  const [customBackgroundProcessingId, setCustomBackgroundProcessingId] = useState<string | null>(null);
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
   const [sessionName, setSessionName] = useState("");
   const [joinSessionLink, setJoinSessionLink] = useState("");
@@ -217,6 +234,62 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
     setCategoryPickerOpen(false);
   };
 
+  const openCustomUpload = () => {
+    setCustomImageError("");
+    customImageInputRef.current?.click();
+  };
+
+  const handleCustomImageUpload = async (files?: FileList | null) => {
+    setCustomImageError("");
+    const selectedFiles = Array.from(files ?? []);
+    if (!selectedFiles.length) return;
+
+    const imageFiles = selectedFiles.filter((file) => file.type.startsWith("image/"));
+    if (!imageFiles.length) {
+      setCustomImageError("Upload an image file.");
+      return;
+    }
+
+    try {
+      const nextImages = await Promise.all(
+        imageFiles.map(async (file, index) => ({
+          id: uid(),
+          name: file.name,
+          src: await readFileAsDataUrl(file),
+          position: { x: 32 + index * 28, y: 130 + index * 28 },
+          size: { width: 280, height: 220 },
+        })),
+      );
+
+      setCustomImages((current) => [...current, ...nextImages]);
+    } catch (error) {
+      setCustomImageError(error instanceof Error ? error.message : "Could not load that image.");
+    } finally {
+      if (customImageInputRef.current) customImageInputRef.current.value = "";
+    }
+  };
+
+  const removeCustomImageBackground = async (imageId: string) => {
+    const image = customImages.find((item) => item.id === imageId);
+    if (!image) return;
+
+    setCustomImageError("");
+    setCustomBackgroundProcessingId(imageId);
+
+    try {
+      const src = await removeBackgroundFromImage(image.src);
+      setCustomImages((current) =>
+        current.map((item) => (item.id === imageId ? { ...item, src } : item)),
+      );
+    } catch (error) {
+      setCustomImageError(
+        error instanceof Error ? error.message : "Could not remove the background.",
+      );
+    } finally {
+      setCustomBackgroundProcessingId(null);
+    }
+  };
+
   if (chapterIntroLevel) {
     return (
       <ChapterIntro
@@ -231,6 +304,35 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
       className={`relative min-h-screen overflow-y-auto ${levelUpLevel ? "level-up-falling" : ""}`}
       style={stageBackground}
     >
+      <input
+        ref={customImageInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(event) => void handleCustomImageUpload(event.target.files)}
+      />
+      {customImages.map((image) => (
+        <CustomWorkspaceImageObject
+          key={image.id}
+          image={image}
+          onMove={(position) => {
+            setCustomImages((current) =>
+              current.map((item) => (item.id === image.id ? { ...item, position } : item)),
+            );
+          }}
+          onResize={(size) => {
+            setCustomImages((current) =>
+              current.map((item) => (item.id === image.id ? { ...item, size } : item)),
+            );
+          }}
+          onRemove={() => {
+            setCustomImages((current) => current.filter((item) => item.id !== image.id));
+          }}
+          onRemoveBackground={() => void removeCustomImageBackground(image.id)}
+          removingBackground={customBackgroundProcessingId === image.id}
+        />
+      ))}
       {!visibilityFocusMode && (
         <div className="fixed left-5 top-5 z-50">
           <a
@@ -264,6 +366,34 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
           >
             camera
           </button>
+          <button
+            type="button"
+            onClick={openCustomUpload}
+            className="inline-flex h-11 items-center gap-2 rounded-full border-2 border-black bg-white px-4 font-bold text-black shadow-sm transition hover:bg-black/5"
+            aria-label="custom upload"
+          >
+            <ImagePlus className="size-4" />
+            custom
+          </button>
+          <button
+            onClick={() => setSessionDialogOpen(true)}
+            className="inline-flex h-11 items-center justify-center rounded-full border-2 border-black bg-white px-4 font-bold text-black shadow-sm transition hover:bg-black/5"
+            aria-label="session"
+          >
+            session
+          </button>
+          <button
+            onClick={goHome}
+            className="inline-flex h-11 items-center justify-center rounded-full border-2 border-black bg-white px-4 font-bold text-black shadow-sm transition hover:bg-black/5"
+            aria-label="home"
+          >
+            home
+          </button>
+          {customImageError && (
+            <div className="rounded-full border-2 border-black bg-white px-4 py-2 font-bold text-red-700 shadow-sm">
+              {customImageError}
+            </div>
+          )}
         </div>
       )}
       <div className="mx-auto max-w-7xl px-6 py-10 md:py-14">
@@ -305,6 +435,15 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
                 camera
               </button>
               <button
+                type="button"
+                onClick={openCustomUpload}
+                className="inline-flex h-11 items-center gap-2 rounded-full border-2 border-black bg-white px-4 font-bold text-black shadow-sm transition hover:bg-black/5"
+                aria-label="custom upload"
+              >
+                <Upload className="size-4" />
+                custom
+              </button>
+              <button
                 onClick={() => setSessionDialogOpen(true)}
                 className="inline-flex h-11 items-center justify-center rounded-full border-2 border-black bg-white px-4 font-bold text-black shadow-sm transition hover:bg-black/5"
                 aria-label="session"
@@ -337,6 +476,11 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
                   </button>
                 }
               />
+              {customImageError && (
+                <div className="inline-flex h-11 items-center rounded-full border-2 border-black bg-white px-4 text-sm font-bold text-red-700 shadow-sm">
+                  {customImageError}
+                </div>
+              )}
             </div>
 
             {editing ? (
@@ -606,6 +750,96 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
   );
 }
 
+function CustomWorkspaceImageObject({
+  image,
+  onMove,
+  onResize,
+  onRemove,
+  onRemoveBackground,
+  removingBackground,
+}: {
+  image: CustomWorkspaceImage;
+  onMove: (position: { x: number; y: number }) => void;
+  onResize: (size: { width: number; height: number }) => void;
+  onRemove: () => void;
+  onRemoveBackground: () => void;
+  removingBackground: boolean;
+}) {
+  const nodeRef = useRef<HTMLDivElement>(null);
+  const lastSizeRef = useRef(image.size);
+
+  useEffect(() => {
+    const node = nodeRef.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(([entry]) => {
+      const width = Math.round(entry.contentRect.width);
+      const height = Math.round(entry.contentRect.height);
+      const lastSize = lastSizeRef.current;
+
+      if (width === lastSize.width && height === lastSize.height) return;
+
+      lastSizeRef.current = { width, height };
+      onResize({ width, height });
+    });
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [onResize]);
+
+  useEffect(() => {
+    lastSizeRef.current = image.size;
+  }, [image.size]);
+
+  return (
+    <Draggable
+      nodeRef={nodeRef}
+      position={image.position}
+      onStop={(_, data) => onMove({ x: data.x, y: data.y })}
+      cancel="button"
+    >
+      <div
+        ref={nodeRef}
+        className="group absolute left-0 top-0 z-[15] min-h-[80px] min-w-[80px] cursor-move resize overflow-hidden outline outline-2 outline-transparent transition hover:outline-black"
+        style={{ width: image.size.width, height: image.size.height }}
+      >
+        <img
+          src={image.src}
+          alt={image.name}
+          className="h-full w-full object-contain"
+          draggable={false}
+        />
+        <div className="absolute right-1 top-1 hidden gap-1 group-hover:flex">
+          <button
+            type="button"
+            onClick={onRemoveBackground}
+            disabled={removingBackground}
+            className="flex size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+            aria-label={`Remove background from ${image.name}`}
+            title="Remove background"
+          >
+            <Eraser className="size-4" strokeWidth={3} />
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="flex size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md"
+            aria-label={`Remove ${image.name}`}
+            title="Remove image"
+          >
+            <X className="size-4" strokeWidth={4} />
+          </button>
+        </div>
+        {removingBackground && (
+          <div className="absolute inset-x-2 bottom-2 bg-white px-2 py-1 text-center text-xs font-bold text-black shadow-md">
+            Removing bg...
+          </div>
+        )}
+      </div>
+    </Draggable>
+  );
+}
+
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error) return error.message;
 
@@ -614,6 +848,105 @@ function getErrorMessage(error: unknown, fallback: string) {
   }
 
   return fallback;
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("Could not read that image."));
+    };
+    reader.onerror = () => reject(new Error("Could not read that image."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Could not process that image."));
+    image.src = src;
+  });
+}
+
+async function removeBackgroundFromImage(src: string) {
+  const image = await loadImage(src);
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) throw new Error("Background removal is not available in this browser.");
+
+  canvas.width = image.naturalWidth;
+  canvas.height = image.naturalHeight;
+  context.drawImage(image, 0, 0);
+
+  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  const background = sampleCornerColor(data, canvas.width, canvas.height);
+  const tolerance = 72;
+  const softEdge = 28;
+
+  for (let index = 0; index < data.length; index += 4) {
+    const distance = colorDistance(
+      data[index],
+      data[index + 1],
+      data[index + 2],
+      background.r,
+      background.g,
+      background.b,
+    );
+
+    if (distance <= tolerance) {
+      data[index + 3] = 0;
+    } else if (distance <= tolerance + softEdge) {
+      const alphaRatio = (distance - tolerance) / softEdge;
+      data[index + 3] = Math.round(data[index + 3] * alphaRatio);
+    }
+  }
+
+  context.putImageData(imageData, 0, 0);
+  return canvas.toDataURL("image/png");
+}
+
+function sampleCornerColor(data: Uint8ClampedArray, width: number, height: number) {
+  const points = [
+    { x: 0, y: 0 },
+    { x: width - 1, y: 0 },
+    { x: 0, y: height - 1 },
+    { x: width - 1, y: height - 1 },
+  ];
+
+  const totals = points.reduce(
+    (acc, point) => {
+      const index = (point.y * width + point.x) * 4;
+      return {
+        r: acc.r + data[index],
+        g: acc.g + data[index + 1],
+        b: acc.b + data[index + 2],
+      };
+    },
+    { r: 0, g: 0, b: 0 },
+  );
+
+  return {
+    r: totals.r / points.length,
+    g: totals.g / points.length,
+    b: totals.b / points.length,
+  };
+}
+
+function colorDistance(
+  redA: number,
+  greenA: number,
+  blueA: number,
+  redB: number,
+  greenB: number,
+  blueB: number,
+) {
+  return Math.sqrt(
+    (redA - redB) ** 2 + (greenA - greenB) ** 2 + (blueA - blueB) ** 2,
+  );
 }
 
 function ChapterIntro({

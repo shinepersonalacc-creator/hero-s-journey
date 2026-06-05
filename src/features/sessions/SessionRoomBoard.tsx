@@ -7,9 +7,7 @@ import {
   Eraser,
   Grip,
   ImagePlus,
-  Layers,
   Maximize2,
-  Upload,
   Video,
   VideoOff,
   X,
@@ -70,19 +68,11 @@ type CustomImageAsset = {
   src: string;
   layer: CustomImageLayer;
   position: { x: number; y: number };
+  size: { width: number; height: number };
 };
 
-const participantStorageKey = "ascend.session.participant";
-
 function getParticipantId() {
-  if (typeof window === "undefined") return uid();
-
-  const existing = sessionStorage.getItem(participantStorageKey);
-  if (existing) return existing;
-
-  const id = uid();
-  sessionStorage.setItem(participantStorageKey, id);
-  return id;
+  return uid();
 }
 
 function toSharedCategory(category?: Category | null): SharedCategory | null {
@@ -138,7 +128,6 @@ export function SessionRoomBoard({ sessionId, categories, localXP, hostUserId }:
   const [displayName, setDisplayName] = useState("Session guest");
   const [userId, setUserId] = useState<string | null>(null);
   const [cardPositions, setCardPositions] = useState<Record<string, { x: number; y: number }>>({});
-  const [customToolsOpen, setCustomToolsOpen] = useState(false);
   const [customImage, setCustomImage] = useState<CustomImageAsset | null>(null);
   const [customImageError, setCustomImageError] = useState("");
   const [removingCustomBg, setRemovingCustomBg] = useState(false);
@@ -219,7 +208,7 @@ export function SessionRoomBoard({ sessionId, categories, localXP, hostUserId }:
         item.levelPercent === nextItem.levelPercent &&
         item.pointsToNextLevel === nextItem.pointsToNextLevel &&
         item.name === nextItem.name &&
-        item.category?.id === nextItem.category?.id
+        JSON.stringify(item.category) === JSON.stringify(nextItem.category)
       );
     });
   };
@@ -551,7 +540,7 @@ return () => {
 
       setCameraActive(true);
       cameraActiveRef.current = true;
-      //trackPresence(true);
+      trackPresence();
       await Promise.all(
         participantsRef.current
           .filter((participant) => participant.participantId !== participantId)
@@ -561,7 +550,7 @@ return () => {
       setCameraError(getCameraErrorMessage(error));
       setCameraActive(false);
       cameraActiveRef.current = false;
-      //trackPresence(false);
+      trackPresence();
     }
   };
 
@@ -582,7 +571,7 @@ return () => {
     });
     setCameraActive(false);
     cameraActiveRef.current = false;
-    //trackPresence(false);
+    trackPresence();
   };
 
   const closeCamera = () => {
@@ -608,6 +597,7 @@ return () => {
         src,
         layer: customImage?.layer ?? "top",
         position: customImage?.position ?? { x: 24, y: 120 },
+        size: customImage?.size ?? { width: 280, height: 220 },
       });
     } catch (error) {
       setCustomImageError(error instanceof Error ? error.message : "Could not load that image.");
@@ -647,6 +637,11 @@ return () => {
           onMove={(position) => {
             setCustomImage((current) => (current ? { ...current, position } : current));
           }}
+          onResize={(size) => {
+            setCustomImage((current) => (current ? { ...current, size } : current));
+          }}
+          onRemoveBackground={() => void removeCustomImageBackground()}
+          removingBackground={removingCustomBg}
           onRemove={() => setCustomImage(null)}
         />
       )}
@@ -689,77 +684,21 @@ return () => {
 
         <button
           type="button"
-          onClick={() => setCustomToolsOpen((open) => !open)}
+          onClick={() => customImageInputRef.current?.click()}
           className="inline-flex h-11 items-center gap-2 rounded-xl border-2 border-black bg-[#f7e35b] px-4 font-bold text-black hover:bg-[#ffe95f]"
         >
           <ImagePlus className="size-4" />
           Custom
         </button>
+        <input
+          ref={customImageInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(event) => void handleCustomImageUpload(event.target.files?.[0])}
+        />
+        {customImageError && <div className="font-semibold text-red-700">{customImageError}</div>}
       </div>
-
-      {customToolsOpen && (
-        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border-2 border-black bg-[#fff1dd] p-4 text-black shadow-xl">
-          <input
-            ref={customImageInputRef}
-            type="file"
-            accept="image/png,image/jpeg"
-            className="hidden"
-            onChange={(event) => void handleCustomImageUpload(event.target.files?.[0])}
-          />
-
-          <button
-            type="button"
-            onClick={() => customImageInputRef.current?.click()}
-            className="inline-flex h-11 items-center gap-2 rounded-xl bg-black px-4 font-bold text-white hover:bg-black/85"
-          >
-            <Upload className="size-4" />
-            Upload image
-          </button>
-
-          <button
-            type="button"
-            onClick={() => void removeCustomImageBackground()}
-            disabled={!customImage || removingCustomBg}
-            className="inline-flex h-11 items-center gap-2 rounded-xl border-2 border-black bg-white px-4 font-bold text-black hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            <Eraser className="size-4" />
-            {removingCustomBg ? "Removing..." : "Remove bg"}
-          </button>
-
-          <div className="inline-flex h-11 overflow-hidden rounded-xl border-2 border-black bg-white font-bold">
-            <button
-              type="button"
-              onClick={() =>
-                setCustomImage((current) => (current ? { ...current, layer: "below" } : current))
-              }
-              className={`inline-flex items-center gap-2 px-4 ${
-                customImage?.layer === "below" ? "bg-black text-white" : "text-black"
-              }`}
-            >
-              <Layers className="size-4" />
-              Below
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                setCustomImage((current) => (current ? { ...current, layer: "top" } : current))
-              }
-              className={`border-l-2 border-black px-4 ${
-                customImage?.layer !== "below" ? "bg-black text-white" : "text-black"
-              }`}
-            >
-              Top
-            </button>
-          </div>
-
-          {customImage && (
-            <div className="min-w-0 flex-1 truncate font-semibold text-black/70">
-              {customImage.name}
-            </div>
-          )}
-          {customImageError && <div className="font-semibold text-red-700">{customImageError}</div>}
-        </div>
-      )}
 
       {!categories.length && (
         <div className="mt-4 rounded-xl bg-black px-4 py-3 font-semibold text-white">
@@ -820,7 +759,7 @@ return () => {
               title={`${participant.name} - lvl ${participant.level ?? 1}`}
               stream={remoteStreams[participant.participantId]}
               active={Boolean(remoteStreams[participant.participantId])}
-              canDrag={false}
+              canDrag
               defaultPosition={{ x: (index % 2) * 340, y: Math.floor(index / 2) * 260 }}
             />
           ))}
@@ -963,14 +902,44 @@ function ParticipantCategoryCard({
 function CustomImageObject({
   image,
   onMove,
+  onResize,
+  onRemoveBackground,
+  removingBackground,
   onRemove,
 }: {
   image: CustomImageAsset;
   onMove: (position: { x: number; y: number }) => void;
+  onResize: (size: { width: number; height: number }) => void;
+  onRemoveBackground: () => void;
+  removingBackground: boolean;
   onRemove: () => void;
 }) {
   const nodeRef = useRef<HTMLDivElement>(null);
+  const lastSizeRef = useRef(image.size);
   const zIndex = image.layer === "top" ? 60 : 1;
+
+  useEffect(() => {
+    const node = nodeRef.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(([entry]) => {
+      const width = Math.round(entry.contentRect.width);
+      const height = Math.round(entry.contentRect.height);
+      const lastSize = lastSizeRef.current;
+
+      if (width === lastSize.width && height === lastSize.height) return;
+
+      lastSizeRef.current = { width, height };
+      onResize({ width, height });
+    });
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [onResize]);
+
+  useEffect(() => {
+    lastSizeRef.current = image.size;
+  }, [image.size]);
 
   return (
     <Draggable
@@ -981,25 +950,41 @@ function CustomImageObject({
     >
       <div
         ref={nodeRef}
-        className="absolute left-0 top-0 w-[min(280px,calc(100vw-2rem))] cursor-grab active:cursor-grabbing"
-        style={{ zIndex }}
+        className="group absolute left-0 top-0 min-h-[80px] min-w-[80px] cursor-move resize overflow-hidden outline outline-2 outline-transparent transition hover:outline-black"
+        style={{ zIndex, width: image.size.width, height: image.size.height }}
       >
-        <div className="group relative">
-          <img
-            src={image.src}
-            alt={image.name}
-            className="max-h-[320px] w-full object-contain drop-shadow-[6px_6px_0_rgba(0,0,0,0.22)]"
-            draggable={false}
-          />
+        <img
+          src={image.src}
+          alt={image.name}
+          className="h-full w-full object-contain"
+          draggable={false}
+        />
+        <div className="absolute right-1 top-1 hidden gap-1 group-hover:flex">
+          <button
+            type="button"
+            onClick={onRemoveBackground}
+            disabled={removingBackground}
+            className="flex size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+            aria-label={`Remove background from ${image.name}`}
+            title="Remove background"
+          >
+            <Eraser className="size-4" strokeWidth={3} />
+          </button>
           <button
             type="button"
             onClick={onRemove}
-            className="absolute right-0 top-0 hidden size-8 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-black bg-white text-black shadow-md group-hover:flex"
+            className="flex size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md"
             aria-label={`Remove ${image.name}`}
+            title="Remove image"
           >
             <X className="size-4" strokeWidth={4} />
           </button>
         </div>
+        {removingBackground && (
+          <div className="absolute inset-x-2 bottom-2 bg-white px-2 py-1 text-center text-xs font-bold text-black shadow-md">
+            Removing bg...
+          </div>
+        )}
       </div>
     </Draggable>
   );
@@ -1108,7 +1093,12 @@ style={{
   if (!canDrag) return content;
 
   return (
-    <Draggable nodeRef={windowRef} handle=".session-camera-handle" cancel="button,video">
+    <Draggable
+      nodeRef={windowRef}
+      handle=".session-camera-handle"
+      cancel="button,video"
+      defaultPosition={defaultPosition}
+    >
       {content}
     </Draggable>
   );

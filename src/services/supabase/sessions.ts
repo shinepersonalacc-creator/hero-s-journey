@@ -26,6 +26,17 @@ type CompletedSessionTaskResponse = SessionTask & {
   profile_level: number;
 };
 
+function isMissingRpcFunctionError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+
+  const maybeError = error as { code?: string; message?: string };
+  return (
+    maybeError.code === "PGRST202" ||
+    maybeError.message?.includes("schema cache") ||
+    maybeError.message?.includes("create_shared_session_secure")
+  );
+}
+
 export async function createSharedSession(name: string) {
   const sessionName = name.trim();
 
@@ -41,9 +52,27 @@ export async function createSharedSession(name: string) {
     session_name: sessionName,
   });
 
-  if (error) throw error;
+  if (!error) return data as SharedSession;
+  if (!isMissingRpcFunctionError(error)) throw error;
 
-  return data as SharedSession;
+  const fallbackId =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2, 10);
+
+  const { data: fallbackData, error: fallbackError } = await supabase
+    .from("sessions")
+    .insert({
+      id: fallbackId,
+      name: sessionName,
+      created_by: user.id,
+    })
+    .select("id, name, created_by, created_at")
+    .single<SharedSession>();
+
+  if (fallbackError) throw fallbackError;
+
+  return fallbackData;
 }
 
 export async function loadSharedSession(id: string) {
