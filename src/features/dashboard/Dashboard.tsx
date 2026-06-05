@@ -312,27 +312,6 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
         className="hidden"
         onChange={(event) => void handleCustomImageUpload(event.target.files)}
       />
-      {customImages.map((image) => (
-        <CustomWorkspaceImageObject
-          key={image.id}
-          image={image}
-          onMove={(position) => {
-            setCustomImages((current) =>
-              current.map((item) => (item.id === image.id ? { ...item, position } : item)),
-            );
-          }}
-          onResize={(size) => {
-            setCustomImages((current) =>
-              current.map((item) => (item.id === image.id ? { ...item, size } : item)),
-            );
-          }}
-          onRemove={() => {
-            setCustomImages((current) => current.filter((item) => item.id !== image.id));
-          }}
-          onRemoveBackground={() => void removeCustomImageBackground(image.id)}
-          removingBackground={customBackgroundProcessingId === image.id}
-        />
-      ))}
       {!visibilityFocusMode && (
         <div className="fixed left-5 top-5 z-50">
           <a
@@ -398,7 +377,7 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
       )}
       <div className="mx-auto max-w-7xl px-6 py-10 md:py-14">
         {!visibilityFocusMode && (
-          <header className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <header className="relative z-40 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
             <div className="level-fall-item flex-1" style={{ animationDelay: "0ms" }}>
             <div className="mt-3 inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-4 py-2 text-base md:text-lg font-bold uppercase tracking-[0.18em] text-black shadow-sm">
               <Target className="size-3" /> {chapter.label}
@@ -599,24 +578,49 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {visibleCategories.map((c, index) => (
-              <div
-                key={c.id}
-                className="level-fall-item"
-                style={{ animationDelay: `${1450 + index * 220}ms` }}
-              >
-                <CategoryCard
-                  category={c}
-                  onChange={updateCategory}
-                  onDelete={() => deleteCategory(c.id)}
-                  onComplete={onComplete}
-                  onMove={(position) => moveCategory(c.id, position)}
-                />
-              </div>
+          <div className="relative z-0 min-h-[520px] overflow-visible">
+            {customImages.map((image) => (
+              <CustomWorkspaceImageObject
+                key={`${image.id}-${image.position.x}-${image.position.y}`}
+                image={image}
+                onMove={(position) => {
+                  setCustomImages((current) =>
+                    current.map((item) => (item.id === image.id ? { ...item, position } : item)),
+                  );
+                }}
+                onResize={(size) => {
+                  setCustomImages((current) =>
+                    current.map((item) => (item.id === image.id ? { ...item, size } : item)),
+                  );
+                }}
+                onRemove={() => {
+                  setCustomImages((current) => current.filter((item) => item.id !== image.id));
+                }}
+                onRemoveBackground={() => void removeCustomImageBackground(image.id)}
+                removingBackground={customBackgroundProcessingId === image.id}
+              />
             ))}
+
+            <div className="relative z-20 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {visibleCategories.map((c, index) => (
+                <div
+                  key={c.id}
+                  className="level-fall-item"
+                  style={{ animationDelay: `${1450 + index * 220}ms` }}
+                >
+                  <CategoryCard
+                    category={c}
+                    onChange={updateCategory}
+                    onDelete={() => deleteCategory(c.id)}
+                    onComplete={onComplete}
+                    onMove={(position) => moveCategory(c.id, position)}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         </section>
+
       </div>
       <VideoCallBox open={videoOpen} onOpenChange={setVideoOpen} />
       {resetPointsOpen && (
@@ -794,19 +798,19 @@ function CustomWorkspaceImageObject({
   return (
     <Draggable
       nodeRef={nodeRef}
-      position={image.position}
+      defaultPosition={image.position}
       onStop={(_, data) => onMove({ x: data.x, y: data.y })}
       cancel="button"
     >
       <div
         ref={nodeRef}
-        className="group absolute left-0 top-0 z-[15] min-h-[80px] min-w-[80px] cursor-move resize overflow-hidden outline outline-2 outline-transparent transition hover:outline-black"
+        className="group absolute left-0 top-0 z-0 min-h-[80px] min-w-[80px] cursor-grab touch-none select-none resize overflow-hidden outline outline-2 outline-transparent will-change-transform hover:outline-black active:cursor-grabbing"
         style={{ width: image.size.width, height: image.size.height }}
       >
         <img
           src={image.src}
           alt={image.name}
-          className="h-full w-full object-contain"
+          className="pointer-events-none h-full w-full select-none object-contain"
           draggable={false}
         />
         <div className="absolute right-1 top-1 hidden gap-1 group-hover:flex">
