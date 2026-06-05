@@ -578,47 +578,59 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
             </div>
           )}
 
-          <div className="relative z-0 min-h-[520px] overflow-visible">
-            {customImages.map((image) => (
-              <CustomWorkspaceImageObject
-                key={`${image.id}-${image.position.x}-${image.position.y}`}
-                image={image}
-                onMove={(position) => {
-                  setCustomImages((current) =>
-                    current.map((item) => (item.id === image.id ? { ...item, position } : item)),
-                  );
-                }}
-                onResize={(size) => {
-                  setCustomImages((current) =>
-                    current.map((item) => (item.id === image.id ? { ...item, size } : item)),
-                  );
-                }}
-                onRemove={() => {
-                  setCustomImages((current) => current.filter((item) => item.id !== image.id));
-                }}
-                onRemoveBackground={() => void removeCustomImageBackground(image.id)}
-                removingBackground={customBackgroundProcessingId === image.id}
-              />
+          <div className="relative z-20 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {visibleCategories.map((c, index) => (
+              <div
+                key={c.id}
+                className="level-fall-item"
+                style={{ animationDelay: `${1450 + index * 220}ms` }}
+              >
+                <CategoryCard
+                  category={c}
+                  onChange={updateCategory}
+                  onDelete={() => deleteCategory(c.id)}
+                  onComplete={onComplete}
+                  onMove={(position) => moveCategory(c.id, position)}
+                />
+              </div>
             ))}
-
-            <div className="relative z-20 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {visibleCategories.map((c, index) => (
-                <div
-                  key={c.id}
-                  className="level-fall-item"
-                  style={{ animationDelay: `${1450 + index * 220}ms` }}
-                >
-                  <CategoryCard
-                    category={c}
-                    onChange={updateCategory}
-                    onDelete={() => deleteCategory(c.id)}
-                    onComplete={onComplete}
-                    onMove={(position) => moveCategory(c.id, position)}
-                  />
-                </div>
-              ))}
-            </div>
           </div>
+
+          {customImages.length > 0 && (
+            <div className="mt-12">
+              {!visibilityFocusMode && (
+                <div
+                  className="level-fall-item mb-5 flex items-baseline justify-between"
+                  style={{ animationDelay: "1250ms" }}
+                >
+                  <h2 className="font-display text-2xl font-semibold">Custom Images</h2>
+                </div>
+              )}
+              <div className="relative z-0 min-h-[240px] overflow-visible">
+                {customImages.map((image) => (
+                  <CustomWorkspaceImageObject
+                    key={`${image.id}-${image.position.x}-${image.position.y}`}
+                    image={image}
+                    onMove={(position) => {
+                      setCustomImages((current) =>
+                        current.map((item) => (item.id === image.id ? { ...item, position } : item)),
+                      );
+                    }}
+                    onResize={(size) => {
+                      setCustomImages((current) =>
+                        current.map((item) => (item.id === image.id ? { ...item, size } : item)),
+                      );
+                    }}
+                    onRemove={() => {
+                      setCustomImages((current) => current.filter((item) => item.id !== image.id));
+                    }}
+                    onRemoveBackground={() => void removeCustomImageBackground(image.id)}
+                    removingBackground={customBackgroundProcessingId === image.id}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
       </div>
@@ -804,21 +816,25 @@ function CustomWorkspaceImageObject({
     >
       <div
         ref={nodeRef}
-        className="group absolute left-0 top-0 z-0 min-h-[80px] min-w-[80px] cursor-grab touch-none select-none resize overflow-hidden outline outline-2 outline-transparent will-change-transform hover:outline-black active:cursor-grabbing"
+        className="group absolute left-0 top-0 z-0 min-h-[80px] min-w-[80px] cursor-grab touch-none select-none resize overflow-hidden rounded-2xl border border-black/20 bg-white p-3 shadow-sm will-change-transform hover:shadow-md hover:border-black/40 active:cursor-grabbing transition-all"
         style={{ width: image.size.width, height: image.size.height }}
       >
-        <img
-          src={image.src}
-          alt={image.name}
-          className="pointer-events-none h-full w-full select-none object-contain"
-          draggable={false}
-        />
-        <div className="absolute right-1 top-1 hidden gap-1 group-hover:flex">
+        <div className="h-full w-full flex flex-col">
+          <div className="flex-1 overflow-hidden flex items-center justify-center bg-black/5 rounded-lg">
+            <img
+              src={image.src}
+              alt={image.name}
+              className="pointer-events-none h-full w-full select-none object-contain"
+              draggable={false}
+            />
+          </div>
+        </div>
+        <div className="absolute right-2 top-2 hidden gap-1 group-hover:flex">
           <button
             type="button"
             onClick={onRemoveBackground}
             disabled={removingBackground}
-            className="flex size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md disabled:cursor-not-allowed disabled:opacity-60 hover:bg-black/5"
             aria-label={`Remove background from ${image.name}`}
             title="Remove background"
           >
@@ -827,7 +843,7 @@ function CustomWorkspaceImageObject({
           <button
             type="button"
             onClick={onRemove}
-            className="flex size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md"
+            className="flex size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md hover:bg-black/5"
             aria-label={`Remove ${image.name}`}
             title="Remove image"
           >
@@ -835,7 +851,7 @@ function CustomWorkspaceImageObject({
           </button>
         </div>
         {removingBackground && (
-          <div className="absolute inset-x-2 bottom-2 bg-white px-2 py-1 text-center text-xs font-bold text-black shadow-md">
+          <div className="absolute inset-x-2 bottom-2 bg-white px-2 py-1 text-center text-xs font-bold text-black shadow-md rounded">
             Removing bg...
           </div>
         )}
