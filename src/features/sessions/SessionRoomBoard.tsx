@@ -1,17 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import Draggable from "react-draggable";
-import {
-  Camera,
-  CameraOff,
-  Check,
-  Eraser,
-  Grip,
-  ImagePlus,
-  Maximize2,
-  Video,
-  VideoOff,
-  X,
-} from "lucide-react";
+import { Camera, CameraOff, Check, Grip, ImagePlus, Maximize2, Video, VideoOff, X } from "lucide-react";
 import { supabase } from "@/services/supabase/supabase";
 import { Category, levelInfo, uid } from "@/services/storage/storage";
 import { SignalSchema, type SignalMessage } from "./signalSchema";
@@ -52,6 +41,24 @@ type ParticipantPresence = {
   joinedAt: number;
 };
 
+type CustomImageAsset = {
+  id: string;
+  name: string;
+  src: string;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+};
+
+type CustomImageBroadcastPayload =
+  | { action: "add"; images: CustomImageAsset[] }
+  | { action: "move"; id: string; position: { x: number; y: number } }
+  | { action: "resize"; id: string; size: { width: number; height: number } }
+  | { action: "remove"; id: string };
+
+type CustomImageBroadcastMessage = CustomImageBroadcastPayload & {
+  from: string;
+};
+
 type PeerContext = {
   peer: RTCPeerConnection;
   makingOffer: boolean;
@@ -60,19 +67,17 @@ type PeerContext = {
   polite: boolean;
 };
 
-type CustomImageLayer = "below" | "top";
-
-type CustomImageAsset = {
-  id: string;
-  name: string;
-  src: string;
-  layer: CustomImageLayer;
-  position: { x: number; y: number };
-  size: { width: number; height: number };
-};
+const participantStorageKey = "ascend.session.participant";
 
 function getParticipantId() {
-  return uid();
+  if (typeof window === "undefined") return uid();
+
+  const existing = sessionStorage.getItem(participantStorageKey);
+  if (existing) return existing;
+
+  const id = uid();
+  sessionStorage.setItem(participantStorageKey, id);
+  return id;
 }
 
 function toSharedCategory(category?: Category | null): SharedCategory | null {
@@ -106,10 +111,88 @@ function summarizePresence(state: Record<string, ParticipantPresence[]>) {
   return Array.from(byId.values()).sort((a, b) => a.joinedAt - b.joinedAt);
 }
 
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("Could not read that image."));
+    };
+    reader.onerror = () => reject(new Error("Could not read that image."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function isPoint(value: unknown): value is { x: number; y: number } {
+  if (!value || typeof value !== "object") return false;
+  const point = value as { x?: unknown; y?: unknown };
+  return typeof point.x === "number" && typeof point.y === "number";
+}
+
+function isSize(value: unknown): value is { width: number; height: number } {
+  if (!value || typeof value !== "object") return false;
+  const size = value as { width?: unknown; height?: unknown };
+  return typeof size.width === "number" && typeof size.height === "number";
+}
+
+function isCustomImageAsset(value: unknown): value is CustomImageAsset {
+  if (!value || typeof value !== "object") return false;
+  const image = value as {
+    id?: unknown;
+    name?: unknown;
+    src?: unknown;
+    position?: unknown;
+    size?: unknown;
+  };
+
+  return (
+    typeof image.id === "string" &&
+    typeof image.name === "string" &&
+    typeof image.src === "string" &&
+    isPoint(image.position) &&
+    isSize(image.size)
+  );
+}
+
+function parseCustomImageBroadcast(payload: unknown): CustomImageBroadcastMessage | null {
+  if (!payload || typeof payload !== "object") return null;
+  const message = payload as {
+    from?: unknown;
+    action?: unknown;
+    images?: unknown;
+    id?: unknown;
+    position?: unknown;
+    size?: unknown;
+  };
+
+  if (typeof message.from !== "string" || typeof message.action !== "string") return null;
+
+  if (message.action === "add") {
+    if (!Array.isArray(message.images) || !message.images.every(isCustomImageAsset)) return null;
+    return { from: message.from, action: "add", images: message.images };
+  }
+
+  if (message.action === "move") {
+    if (typeof message.id !== "string" || !isPoint(message.position)) return null;
+    return { from: message.from, action: "move", id: message.id, position: message.position };
+  }
+
+  if (message.action === "resize") {
+    if (typeof message.id !== "string" || !isSize(message.size)) return null;
+    return { from: message.from, action: "resize", id: message.id, size: message.size };
+  }
+
+  if (message.action === "remove") {
+    if (typeof message.id !== "string") return null;
+    return { from: message.from, action: "remove", id: message.id };
+  }
+
+  return null;
+}
+
 export function SessionRoomBoard({ sessionId, categories, localXP, hostUserId }: Props) {
   const participantId = useMemo(getParticipantId, []);
   const joinedAtRef = useRef(Date.now());
-  const customImageInputRef = useRef<HTMLInputElement>(null);
   const localCameraNodeRef = useRef<HTMLDivElement>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -128,9 +211,11 @@ export function SessionRoomBoard({ sessionId, categories, localXP, hostUserId }:
   const [displayName, setDisplayName] = useState("Session guest");
   const [userId, setUserId] = useState<string | null>(null);
   const [cardPositions, setCardPositions] = useState<Record<string, { x: number; y: number }>>({});
-  const [customImage, setCustomImage] = useState<CustomImageAsset | null>(null);
+  const customImageInputRef = useRef<HTMLInputElement>(null);
+  const customImagesRef = useRef<CustomImageAsset[]>([]);
+  const [customImages, setCustomImages] = useState<CustomImageAsset[]>([]);
   const [customImageError, setCustomImageError] = useState("");
-  const [removingCustomBg, setRemovingCustomBg] = useState(false);
+  const [customOnlyMode, setCustomOnlyMode] = useState(false);
 
   const selectedCategory = useMemo(
     () =>
@@ -208,7 +293,7 @@ export function SessionRoomBoard({ sessionId, categories, localXP, hostUserId }:
         item.levelPercent === nextItem.levelPercent &&
         item.pointsToNextLevel === nextItem.pointsToNextLevel &&
         item.name === nextItem.name &&
-        JSON.stringify(item.category) === JSON.stringify(nextItem.category)
+        item.category?.id === nextItem.category?.id
       );
     });
   };
@@ -240,6 +325,28 @@ export function SessionRoomBoard({ sessionId, categories, localXP, hostUserId }:
         from: participantId,
       },
     });
+  };
+
+  const broadcastCustomImageChange = (payload: CustomImageBroadcastPayload) => {
+    void channelRef.current?.send({
+      type: "broadcast",
+      event: "custom-image",
+      payload: {
+        ...payload,
+        from: participantId,
+      },
+    });
+  };
+
+  const updateCustomImages = (
+    updater: (current: CustomImageAsset[]) => CustomImageAsset[],
+    broadcastPayload?: CustomImageBroadcastPayload,
+  ) => {
+    const nextImages = updater(customImagesRef.current);
+    customImagesRef.current = nextImages;
+    setCustomImages(nextImages);
+
+    if (broadcastPayload) broadcastCustomImageChange(broadcastPayload);
   };
 
   const attachLocalStreamToPeer = (peer: RTCPeerConnection, stream: MediaStream) => {
@@ -447,6 +554,10 @@ export function SessionRoomBoard({ sessionId, categories, localXP, hostUserId }:
         participantsRef.current = nextParticipants;
         setParticipants(nextParticipants);
 
+        if (newPeers.length && customImagesRef.current.length) {
+          broadcastCustomImageChange({ action: "add", images: customImagesRef.current });
+        }
+
         if (cameraActiveRef.current) {
           newPeers.forEach((participant) => {
             if (peersRef.current.has(participant.participantId)) return;
@@ -467,6 +578,45 @@ export function SessionRoomBoard({ sessionId, categories, localXP, hostUserId }:
         if (signal.from === participantId) return;
 
         void handleSignal(signal);
+      })
+      .on("broadcast", { event: "custom-image" }, ({ payload }) => {
+        const message = parseCustomImageBroadcast(payload);
+        if (!message || message.from === participantId) return;
+
+        if (message.action === "add") {
+          const incomingImages = message.images;
+          customImagesRef.current = [
+            ...customImagesRef.current.filter(
+              (image) => !incomingImages.some((incoming) => incoming.id === image.id),
+            ),
+            ...incomingImages,
+          ];
+          setCustomImages(customImagesRef.current);
+          return;
+        }
+
+        if (message.action === "move") {
+          customImagesRef.current = customImagesRef.current.map((image) =>
+            image.id === message.id ? { ...image, position: message.position } : image,
+          );
+          setCustomImages(customImagesRef.current);
+          return;
+        }
+
+        if (message.action === "resize") {
+          customImagesRef.current = customImagesRef.current.map((image) =>
+            image.id === message.id ? { ...image, size: message.size } : image,
+          );
+          setCustomImages(customImagesRef.current);
+          return;
+        }
+
+        if (message.action === "remove") {
+          customImagesRef.current = customImagesRef.current.filter(
+            (image) => image.id !== message.id,
+          );
+          setCustomImages(customImagesRef.current);
+        }
       })
       .subscribe((status) => {
         if (status === "SUBSCRIBED") trackPresence();
@@ -540,7 +690,7 @@ return () => {
 
       setCameraActive(true);
       cameraActiveRef.current = true;
-      trackPresence();
+      //trackPresence(true);
       await Promise.all(
         participantsRef.current
           .filter((participant) => participant.participantId !== participantId)
@@ -550,7 +700,7 @@ return () => {
       setCameraError(getCameraErrorMessage(error));
       setCameraActive(false);
       cameraActiveRef.current = false;
-      trackPresence();
+      //trackPresence(false);
     }
   };
 
@@ -571,7 +721,7 @@ return () => {
     });
     setCameraActive(false);
     cameraActiveRef.current = false;
-    trackPresence();
+    //trackPresence(false);
   };
 
   const closeCamera = () => {
@@ -580,25 +730,33 @@ return () => {
     setCameraError("");
   };
 
-  const handleCustomImageUpload = async (file?: File | null) => {
+  const handleCustomImageUpload = async (files?: FileList | null) => {
     setCustomImageError("");
-    if (!file) return;
+    const selectedFiles = Array.from(files ?? []);
+    if (!selectedFiles.length) return;
 
-    if (!["image/jpeg", "image/png"].includes(file.type)) {
-      setCustomImageError("Upload a JPG or PNG image.");
+    const imageFiles = selectedFiles.filter((file) => file.type.startsWith("image/"));
+    if (!imageFiles.length) {
+      setCustomImageError("Upload an image file.");
       return;
     }
 
     try {
-      const src = await readFileAsDataUrl(file);
-      setCustomImage({
-        id: uid(),
-        name: file.name,
-        src,
-        layer: customImage?.layer ?? "top",
-        position: customImage?.position ?? { x: 24, y: 120 },
-        size: customImage?.size ?? { width: 280, height: 220 },
+      const nextImages = await Promise.all(
+        imageFiles.map(async (file, index) => ({
+          id: uid(),
+          name: file.name,
+          src: await readFileAsDataUrl(file),
+          position: { x: 24 + index * 32, y: 24 + index * 32 },
+          size: { width: 280, height: 220 },
+        })),
+      );
+
+      updateCustomImages((current) => [...current, ...nextImages], {
+        action: "add",
+        images: nextImages,
       });
+      setCustomOnlyMode(false);
     } catch (error) {
       setCustomImageError(error instanceof Error ? error.message : "Could not load that image.");
     } finally {
@@ -606,47 +764,46 @@ return () => {
     }
   };
 
-  const removeCustomImageBackground = async () => {
-    if (!customImage) {
-      setCustomImageError("Upload an image first.");
-      return;
-    }
-
-    setRemovingCustomBg(true);
-    setCustomImageError("");
-
-    try {
-      const src = await removeBackgroundFromImage(customImage.src);
-      setCustomImage((current) => (current ? { ...current, src } : current));
-    } catch (error) {
-      setCustomImageError(
-        error instanceof Error ? error.message : "Could not remove the background.",
-      );
-    } finally {
-      setRemovingCustomBg(false);
-    }
-  };
-
   const displayedParticipants = participants.filter((participant) => participant.category);
 
-  return (
-    <div className="relative mt-8 min-h-[720px]">
-      {customImage && (
-        <CustomImageObject
-          image={customImage}
-          onMove={(position) => {
-            setCustomImage((current) => (current ? { ...current, position } : current));
-          }}
-          onResize={(size) => {
-            setCustomImage((current) => (current ? { ...current, size } : current));
-          }}
-          onRemoveBackground={() => void removeCustomImageBackground()}
-          removingBackground={removingCustomBg}
-          onRemove={() => setCustomImage(null)}
+  if (customOnlyMode) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+        <button
+          type="button"
+          onClick={() => setCustomOnlyMode(false)}
+          className="fixed top-4 right-4 inline-flex h-11 items-center gap-2 rounded-xl border-2 border-black bg-[#f7e35b] px-4 font-bold text-black hover:bg-[#ffe95f]"
+        >
+          <ImagePlus className="size-4" />
+          Exit
+        </button>
+        <div className="flex flex-col items-center gap-4 rounded-3xl border-4 border-black bg-white p-8 text-black shadow-[8px_8px_0_rgba(0,0,0,0.25)]">
+          <div className="text-center text-2xl font-black">Upload custom images</div>
+          <button
+            type="button"
+            onClick={() => customImageInputRef.current?.click()}
+            className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl border-2 border-black bg-[#f7e35b] px-6 text-lg font-bold text-black hover:bg-[#ffe95f]"
+          >
+            <ImagePlus className="size-5" />
+            Upload images
+          </button>
+          {customImageError && <div className="font-semibold text-red-700">{customImageError}</div>}
+        </div>
+        <input
+          ref={customImageInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(event) => void handleCustomImageUpload(event.target.files)}
         />
-      )}
+      </div>
+    );
+  }
 
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border-2 border-black bg-white p-4 text-black shadow-xl">
+  return (
+    <div className="relative isolate mt-8">
+      <div className="relative z-30 flex flex-wrap items-center gap-3 rounded-2xl border-2 border-black bg-white p-4 text-black shadow-xl">
         <label className="flex min-w-[220px] flex-1 flex-col gap-1 font-bold">
           <span className="text-xs uppercase tracking-[0.2em] text-black/60">
             Category shown to group
@@ -684,29 +841,47 @@ return () => {
 
         <button
           type="button"
-          onClick={() => customImageInputRef.current?.click()}
+          onClick={() => setCustomOnlyMode(true)}
           className="inline-flex h-11 items-center gap-2 rounded-xl border-2 border-black bg-[#f7e35b] px-4 font-bold text-black hover:bg-[#ffe95f]"
         >
           <ImagePlus className="size-4" />
           Custom
         </button>
-        <input
-          ref={customImageInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(event) => void handleCustomImageUpload(event.target.files?.[0])}
-        />
-        {customImageError && <div className="font-semibold text-red-700">{customImageError}</div>}
       </div>
 
       {!categories.length && (
-        <div className="mt-4 rounded-xl bg-black px-4 py-3 font-semibold text-white">
+        <div className="relative z-30 mt-4 rounded-xl bg-black px-4 py-3 font-semibold text-white">
           Create a category on your dashboard, then come back here to share one with the group.
         </div>
       )}
 
-      <div className="relative mt-6 min-h-[260px]">
+      <div className="relative mt-6 min-h-[520px] overflow-visible">
+        {customImages.map((image) => (
+          <CustomSessionImageObject
+            key={`${image.id}-${image.position.x}-${image.position.y}`}
+            image={image}
+            onMove={(position) => {
+              updateCustomImages(
+                (current) =>
+                  current.map((item) => (item.id === image.id ? { ...item, position } : item)),
+                { action: "move", id: image.id, position },
+              );
+            }}
+            onResize={(size) => {
+              updateCustomImages(
+                (current) =>
+                  current.map((item) => (item.id === image.id ? { ...item, size } : item)),
+                { action: "resize", id: image.id, size },
+              );
+            }}
+            onRemove={() => {
+              updateCustomImages(
+                (current) => current.filter((item) => item.id !== image.id),
+                { action: "remove", id: image.id },
+              );
+            }}
+          />
+        ))}
         {displayedParticipants.map((participant, index) => (
           <ParticipantCategoryCard
             key={participant.participantId}
@@ -722,7 +897,7 @@ return () => {
         ))}
       </div>
 
-      {cameraOpen && (
+      <div className="relative z-40" style={{ display: cameraOpen ? undefined : "none" }}>
         <CameraWindow
           nodeRef={localCameraNodeRef}
           title={`${displayName} - lvl ${localLevelInfo.level}`}
@@ -746,9 +921,9 @@ return () => {
             </>
           }
         />
-      )}
+      </div>
 
-      <div className="relative mt-6 min-h-[260px]">
+      <div className="relative z-40 mt-6 min-h-[260px]">
         {participants
           .filter(
             (participant) => participant.participantId !== participantId && participant.cameraOn,
@@ -759,12 +934,81 @@ return () => {
               title={`${participant.name} - lvl ${participant.level ?? 1}`}
               stream={remoteStreams[participant.participantId]}
               active={Boolean(remoteStreams[participant.participantId])}
-              canDrag
+              canDrag={false}
               defaultPosition={{ x: (index % 2) * 340, y: Math.floor(index / 2) * 260 }}
             />
           ))}
       </div>
     </div>
+  );
+}
+
+function CustomSessionImageObject({
+  image,
+  onMove,
+  onResize,
+  onRemove,
+}: {
+  image: CustomImageAsset;
+  onMove: (position: { x: number; y: number }) => void;
+  onResize: (size: { width: number; height: number }) => void;
+  onRemove: () => void;
+}) {
+  const nodeRef = useRef<HTMLDivElement>(null);
+  const lastSizeRef = useRef(image.size);
+
+  useEffect(() => {
+    const node = nodeRef.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(([entry]) => {
+      const width = Math.round(entry.contentRect.width);
+      const height = Math.round(entry.contentRect.height);
+      const lastSize = lastSizeRef.current;
+
+      if (width === lastSize.width && height === lastSize.height) return;
+
+      lastSizeRef.current = { width, height };
+      onResize({ width, height });
+    });
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [onResize]);
+
+  useEffect(() => {
+    lastSizeRef.current = image.size;
+  }, [image.size]);
+
+  return (
+    <Draggable
+      nodeRef={nodeRef}
+      defaultPosition={image.position}
+      onStop={(_, data) => onMove({ x: data.x, y: data.y })}
+      cancel="button"
+    >
+      <div
+        ref={nodeRef}
+        className="group absolute left-0 top-0 z-0 min-h-[80px] min-w-[80px] cursor-grab touch-none select-none resize overflow-hidden outline outline-2 outline-transparent will-change-transform hover:outline-black active:cursor-grabbing"
+        style={{ width: image.size.width, height: image.size.height }}
+      >
+        <img
+          src={image.src}
+          alt={image.name}
+          className="pointer-events-none h-full w-full select-none object-contain"
+          draggable={false}
+        />
+        <button
+          type="button"
+          onClick={onRemove}
+          className="absolute right-1 top-1 hidden size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md group-hover:flex"
+          aria-label={`Remove ${image.name}`}
+          title="Remove image"
+        >
+          <X className="size-4" strokeWidth={4} />
+        </button>
+      </div>
+    </Draggable>
   );
 }
 
@@ -794,7 +1038,7 @@ function ParticipantCategoryCard({
   const card = (
     <div
       ref={nodeRef}
-      className={`absolute left-0 top-0 w-[min(320px,calc(100vw-2rem))] max-w-full min-w-[260px] rounded-2xl border-2 border-black bg-white p-4 text-black shadow-xl ${
+      className={`absolute left-0 top-0 z-20 w-[min(320px,calc(100vw-2rem))] max-w-full min-w-[260px] rounded-2xl border-2 border-black bg-white p-4 text-black shadow-xl ${
         canDrag ? "cursor-grab active:cursor-grabbing" : ""
       } overflow-auto`}
       style={
@@ -895,97 +1139,6 @@ function ParticipantCategoryCard({
       cancel="button,a"
     >
       {card}
-    </Draggable>
-  );
-}
-
-function CustomImageObject({
-  image,
-  onMove,
-  onResize,
-  onRemoveBackground,
-  removingBackground,
-  onRemove,
-}: {
-  image: CustomImageAsset;
-  onMove: (position: { x: number; y: number }) => void;
-  onResize: (size: { width: number; height: number }) => void;
-  onRemoveBackground: () => void;
-  removingBackground: boolean;
-  onRemove: () => void;
-}) {
-  const nodeRef = useRef<HTMLDivElement>(null);
-  const lastSizeRef = useRef(image.size);
-  const zIndex = image.layer === "below" ? 60 : 1;
-
-  useEffect(() => {
-    const node = nodeRef.current;
-    if (!node || typeof ResizeObserver === "undefined") return;
-
-    const observer = new ResizeObserver(([entry]) => {
-      const width = Math.round(entry.contentRect.width);
-      const height = Math.round(entry.contentRect.height);
-      const lastSize = lastSizeRef.current;
-
-      if (width === lastSize.width && height === lastSize.height) return;
-
-      lastSizeRef.current = { width, height };
-      onResize({ width, height });
-    });
-
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [onResize]);
-
-  useEffect(() => {
-    lastSizeRef.current = image.size;
-  }, [image.size]);
-
-  return (
-    <Draggable
-      nodeRef={nodeRef}
-      position={image.position}
-      onStop={(_, data) => onMove({ x: data.x, y: data.y })}
-      cancel="button"
-    >
-      <div
-        ref={nodeRef}
-        className="group absolute left-0 top-0 min-h-[80px] min-w-[80px] cursor-move resize overflow-hidden outline outline-2 outline-transparent transition hover:outline-black"
-        style={{ zIndex, width: image.size.width, height: image.size.height }}
-      >
-        <img
-          src={image.src}
-          alt={image.name}
-          className="h-full w-full object-contain"
-          draggable={false}
-        />
-        <div className="absolute right-1 top-1 hidden gap-1 group-hover:flex">
-          <button
-            type="button"
-            onClick={onRemoveBackground}
-            disabled={removingBackground}
-            className="flex size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md disabled:cursor-not-allowed disabled:opacity-60"
-            aria-label={`Remove background from ${image.name}`}
-            title="Remove background"
-          >
-            <Eraser className="size-4" strokeWidth={3} />
-          </button>
-          <button
-            type="button"
-            onClick={onRemove}
-            className="flex size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md"
-            aria-label={`Remove ${image.name}`}
-            title="Remove image"
-          >
-            <X className="size-4" strokeWidth={4} />
-          </button>
-        </div>
-        {removingBackground && (
-          <div className="absolute inset-x-2 bottom-2 bg-white px-2 py-1 text-center text-xs font-bold text-black shadow-md">
-            Removing bg...
-          </div>
-        )}
-      </div>
     </Draggable>
   );
 }
@@ -1093,12 +1246,7 @@ style={{
   if (!canDrag) return content;
 
   return (
-    <Draggable
-      nodeRef={windowRef}
-      handle=".session-camera-handle"
-      cancel="button,video"
-      defaultPosition={defaultPosition}
-    >
+    <Draggable nodeRef={windowRef} handle=".session-camera-handle" cancel="button,video">
       {content}
     </Draggable>
   );
@@ -1123,103 +1271,4 @@ function isInterruptedPlayError(error: unknown) {
   if (!(error instanceof DOMException)) return false;
 
   return error.name === "AbortError" || error.message.includes("interrupted");
-}
-
-function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") resolve(reader.result);
-      else reject(new Error("Could not read that image."));
-    };
-    reader.onerror = () => reject(new Error("Could not read that image."));
-    reader.readAsDataURL(file);
-  });
-}
-
-function loadImage(src: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("Could not process that image."));
-    image.src = src;
-  });
-}
-
-async function removeBackgroundFromImage(src: string) {
-  const image = await loadImage(src);
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-  if (!context) throw new Error("Background removal is not available in this browser.");
-
-  canvas.width = image.naturalWidth;
-  canvas.height = image.naturalHeight;
-  context.drawImage(image, 0, 0);
-
-  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-  const background = sampleCornerColor(data, canvas.width, canvas.height);
-  const tolerance = 72;
-  const softEdge = 28;
-
-  for (let index = 0; index < data.length; index += 4) {
-    const distance = colorDistance(
-      data[index],
-      data[index + 1],
-      data[index + 2],
-      background.r,
-      background.g,
-      background.b,
-    );
-
-    if (distance <= tolerance) {
-      data[index + 3] = 0;
-    } else if (distance <= tolerance + softEdge) {
-      const alphaRatio = (distance - tolerance) / softEdge;
-      data[index + 3] = Math.round(data[index + 3] * alphaRatio);
-    }
-  }
-
-  context.putImageData(imageData, 0, 0);
-  return canvas.toDataURL("image/png");
-}
-
-function sampleCornerColor(data: Uint8ClampedArray, width: number, height: number) {
-  const points = [
-    { x: 0, y: 0 },
-    { x: width - 1, y: 0 },
-    { x: 0, y: height - 1 },
-    { x: width - 1, y: height - 1 },
-  ];
-
-  const totals = points.reduce(
-    (acc, point) => {
-      const index = (point.y * width + point.x) * 4;
-      return {
-        r: acc.r + data[index],
-        g: acc.g + data[index + 1],
-        b: acc.b + data[index + 2],
-      };
-    },
-    { r: 0, g: 0, b: 0 },
-  );
-
-  return {
-    r: totals.r / points.length,
-    g: totals.g / points.length,
-    b: totals.b / points.length,
-  };
-}
-
-function colorDistance(
-  redA: number,
-  greenA: number,
-  blueA: number,
-  redB: number,
-  greenB: number,
-  blueB: number,
-) {
-  return Math.sqrt(
-    (redA - redB) ** 2 + (greenA - greenB) ** 2 + (blueA - blueB) ** 2,
-  );
 }
