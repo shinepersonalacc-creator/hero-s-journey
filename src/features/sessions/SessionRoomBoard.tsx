@@ -916,7 +916,7 @@ function CustomImageObject({
 }) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const lastSizeRef = useRef(image.size);
-  const zIndex = image.layer === "top" ? 60 : 1;
+  const zIndex = image.layer === "below" ? 60 : 1;
 
   useEffect(() => {
     const node = nodeRef.current;
