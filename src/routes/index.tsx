@@ -79,7 +79,12 @@ function Index() {
       );
       setProfile(profile);
 
-      if (cloudXP) setState((current) => ({ ...current, totalPoints: cloudXP.xp }));
+      if (cloudXP) {
+        setState((current) => ({
+          ...current,
+          totalPoints: Math.max(current.totalPoints, cloudXP.xp),
+        }));
+      }
     } catch (error) {
       console.error("Could not sync auth state:", error);
 

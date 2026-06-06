@@ -33,7 +33,7 @@ import {
   Video,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { Textarea } from "../../components/ui/forms/textarea";
 import { Button } from "../../components/ui/forms/button";
@@ -785,6 +785,7 @@ function CustomWorkspaceImageObject({
 }) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const lastSizeRef = useRef(image.size);
+  const [selected, setSelected] = useState(false);
 
   useEffect(() => {
     const node = nodeRef.current;
@@ -809,6 +810,35 @@ function CustomWorkspaceImageObject({
     lastSizeRef.current = image.size;
   }, [image.size]);
 
+  const startResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setSelected(true);
+
+    const node = nodeRef.current;
+    if (!node) return;
+
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startWidth = node.offsetWidth;
+    const startHeight = node.offsetHeight;
+
+    const resize = (resizeEvent: PointerEvent) => {
+      const width = Math.max(80, Math.round(startWidth + resizeEvent.clientX - startX));
+      const height = Math.max(80, Math.round(startHeight + resizeEvent.clientY - startY));
+      lastSizeRef.current = { width, height };
+      onResize({ width, height });
+    };
+
+    const stopResize = () => {
+      window.removeEventListener("pointermove", resize);
+      window.removeEventListener("pointerup", stopResize);
+    };
+
+    window.addEventListener("pointermove", resize);
+    window.addEventListener("pointerup", stopResize);
+  };
+
   return (
     <Draggable
       nodeRef={nodeRef}
@@ -818,16 +848,28 @@ function CustomWorkspaceImageObject({
     >
       <div
         ref={nodeRef}
-        className="group absolute left-0 top-0 z-10 min-h-[80px] min-w-[80px] cursor-grab touch-none select-none resize overflow-hidden outline outline-2 outline-transparent will-change-transform hover:outline-black active:cursor-grabbing"
+        tabIndex={0}
+        onPointerDown={() => setSelected(true)}
+        onFocus={() => setSelected(true)}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setSelected(false);
+        }}
+        className={`group absolute left-0 top-0 min-h-[80px] min-w-[80px] cursor-grab touch-none select-none overflow-visible outline outline-2 will-change-transform active:cursor-grabbing ${
+          selected ? "z-30 outline-black" : "z-10 outline-transparent hover:outline-black"
+        }`}
         style={{ width: image.size.width, height: image.size.height }}
       >
-        <img
-          src={image.src}
-          alt={image.name}
-          className="pointer-events-none h-full w-full select-none object-contain"
-          draggable={false}
-        />
-        <div className="absolute right-1 top-1 hidden gap-1 group-hover:flex">
+        <div className="h-full w-full overflow-hidden">
+          <img
+            src={image.src}
+            alt={image.name}
+            className="pointer-events-none h-full w-full select-none object-contain"
+            draggable={false}
+          />
+        </div>
+        <div
+          className={`absolute right-1 top-1 gap-1 ${selected ? "flex" : "hidden group-hover:flex"}`}
+        >
           <button
             type="button"
             onClick={onRemoveBackground}
@@ -852,14 +894,19 @@ function CustomWorkspaceImageObject({
             <X className="size-4" strokeWidth={4} />
           </button>
         </div>
-        <div
-          className="pointer-events-none absolute bottom-1 right-1 hidden size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md group-hover:flex"
-          title="Drag the corner to resize"
+        <button
+          type="button"
+          onPointerDown={startResize}
+          className={`custom-image-action absolute bottom-1 right-1 size-8 cursor-se-resize items-center justify-center border-2 border-black bg-white text-black shadow-md ${
+            selected ? "flex" : "hidden group-hover:flex"
+          }`}
+          aria-label={`Resize ${image.name}`}
+          title="Resize image"
         >
           <Maximize2 className="size-4" strokeWidth={3} />
-        </div>
+        </button>
         {removingBackground && (
-          <div className="absolute inset-x-2 bottom-2 bg-white px-2 py-1 text-center text-xs font-bold text-black shadow-md">
+          <div className="absolute inset-x-2 bottom-10 bg-white px-2 py-1 text-center text-xs font-bold text-black shadow-md">
             Removing bg...
           </div>
         )}
