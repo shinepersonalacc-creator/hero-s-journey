@@ -240,40 +240,24 @@ export async function savePreferredDisplayName(name: string) {
 }
 
 export async function saveUserXP(xp: number) {
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError) {
-    console.error("Unable to verify auth user:", userError.message);
-    return null;
-  }
-
-  if (!user) {
-    return null;
-  }
-
-  const level = levelInfo(xp).level;
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .upsert(
-      {
-        id: user.id,
-        xp,
-        level,
-      },
-      { onConflict: "id" },
-    )
-    .select("xp, level")
-    .single<{ xp: number; level: number }>();
+  const safeXP = Math.max(0, Math.round(xp));
+  const { data, error } = await supabase.rpc("save_profile_xp_secure", {
+    total_xp: safeXP,
+  });
 
   if (error) {
     console.error("Could not save XP to profile:", error.message);
     return null;
   }
 
-  return profile;
+  if (!data || Array.isArray(data)) {
+    return null;
+  }
+
+  return {
+    xp: data.xp ?? 0,
+    level: data.level ?? 1,
+  };
 }
 
 export async function addUserXP(amount: number) {
