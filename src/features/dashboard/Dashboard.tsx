@@ -39,6 +39,7 @@ import { Button } from "../../components/ui/forms/button";
 
 const DEFAULT_GOAL_PROMPT = "Where do you see yourself in the end of this journey";
 const DISCORD_URL = "https://discord.gg/cyqGzSPf";
+const CUSTOM_WORKSPACE_IMAGES_KEY = "ascend.dashboard.customImages";
 
 type Props = {
   state: AppState;
@@ -63,7 +64,7 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
   const [hiddenCategoryIds, setHiddenCategoryIds] = useState<string[]>([]);
   const [visibilityFocusMode, setVisibilityFocusMode] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
-  const [customImages, setCustomImages] = useState<CustomWorkspaceImage[]>([]);
+  const [customImages, setCustomImages] = useState<CustomWorkspaceImage[]>(loadStoredCustomImages);
   const [customImageError, setCustomImageError] = useState("");
   const [customBackgroundProcessingId, setCustomBackgroundProcessingId] = useState<string | null>(null);
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
@@ -95,6 +96,16 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
     backgroundRepeat: getChapterBackgroundRepeat(),
     backgroundAttachment: "scroll",
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      window.localStorage.setItem(CUSTOM_WORKSPACE_IMAGES_KEY, JSON.stringify(customImages));
+    } catch {
+      setCustomImageError("Could not save custom images in this browser.");
+    }
+  }, [customImages]);
 
   useEffect(() => {
     if (previousLevel.current !== level && level >= 2 && level <= 10) {
@@ -578,7 +589,7 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
             </div>
           )}
 
-          <div className="relative z-20 grid grid-cols-1 items-start gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <div className="relative z-20 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
             {visibleCategories.map((c, index) => (
               <div
                 key={c.id}
@@ -594,13 +605,13 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
                 />
               </div>
             ))}
-            {customImages.map((image, index) => (
-              <div
-                key={image.id}
-                className="level-fall-item"
-                style={{ animationDelay: `${1450 + (visibleCategories.length + index) * 220}ms` }}
-              >
+          </div>
+
+          {customImages.length > 0 && (
+            <div className="relative mt-8 min-h-[520px] overflow-visible">
+              {customImages.map((image) => (
                 <CustomWorkspaceImageObject
+                  key={image.id}
                   image={image}
                   onMove={(position) => {
                     setCustomImages((current) =>
@@ -618,9 +629,9 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
                   onRemoveBackground={() => void removeCustomImageBackground(image.id)}
                   removingBackground={customBackgroundProcessingId === image.id}
                 />
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
 
       </div>
@@ -800,33 +811,27 @@ function CustomWorkspaceImageObject({
   return (
     <Draggable
       nodeRef={nodeRef}
-      position={image.position}
+      defaultPosition={image.position}
       onStop={(_, data) => onMove({ x: data.x, y: data.y })}
       cancel="button"
-      handle=".drag-handle"
     >
       <div
         ref={nodeRef}
-        className="group relative min-h-[80px] min-w-[80px] max-w-full cursor-grab touch-none select-none resize overflow-hidden rounded-2xl border border-black/20 bg-white p-3 shadow-sm transition-all will-change-transform hover:border-black/40 hover:shadow-md active:cursor-grabbing"
+        className="group absolute left-0 top-0 z-10 min-h-[80px] min-w-[80px] cursor-grab touch-none select-none resize overflow-hidden outline outline-2 outline-transparent will-change-transform hover:outline-black active:cursor-grabbing"
         style={{ width: image.size.width, height: image.size.height }}
       >
-        <div className="drag-handle absolute top-0 left-0 right-0 h-6 cursor-move bg-black/10 rounded-t-2xl" />
-        <div className="h-full w-full flex flex-col pt-6">
-          <div className="flex-1 overflow-hidden flex items-center justify-center bg-black/5 rounded-lg">
-            <img
-              src={image.src}
-              alt={image.name}
-              className="pointer-events-none h-full w-full select-none object-contain"
-              draggable={false}
-            />
-          </div>
-        </div>
-        <div className="absolute right-2 top-2 hidden gap-1 group-hover:flex">
+        <img
+          src={image.src}
+          alt={image.name}
+          className="pointer-events-none h-full w-full select-none object-contain"
+          draggable={false}
+        />
+        <div className="absolute right-1 top-1 hidden gap-1 group-hover:flex">
           <button
             type="button"
             onClick={onRemoveBackground}
             disabled={removingBackground}
-            className="flex size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md disabled:cursor-not-allowed disabled:opacity-60 hover:bg-black/5"
+            className="flex size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md disabled:cursor-not-allowed disabled:opacity-60"
             aria-label={`Remove background from ${image.name}`}
             title="Remove background"
           >
@@ -835,7 +840,7 @@ function CustomWorkspaceImageObject({
           <button
             type="button"
             onClick={onRemove}
-            className="flex size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md hover:bg-black/5"
+            className="flex size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md"
             aria-label={`Remove ${image.name}`}
             title="Remove image"
           >
@@ -843,7 +848,7 @@ function CustomWorkspaceImageObject({
           </button>
         </div>
         {removingBackground && (
-          <div className="absolute inset-x-2 bottom-2 bg-white px-2 py-1 text-center text-xs font-bold text-black shadow-md rounded">
+          <div className="absolute inset-x-2 bottom-2 bg-white px-2 py-1 text-center text-xs font-bold text-black shadow-md">
             Removing bg...
           </div>
         )}
@@ -860,6 +865,54 @@ function getErrorMessage(error: unknown, fallback: string) {
   }
 
   return fallback;
+}
+
+function loadStoredCustomImages() {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const storedImages = window.localStorage.getItem(CUSTOM_WORKSPACE_IMAGES_KEY);
+    if (!storedImages) return [];
+
+    const parsedImages = JSON.parse(storedImages);
+    return Array.isArray(parsedImages) && parsedImages.every(isCustomWorkspaceImage)
+      ? parsedImages
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function isCustomWorkspaceImage(value: unknown): value is CustomWorkspaceImage {
+  if (!value || typeof value !== "object") return false;
+
+  const image = value as {
+    id?: unknown;
+    name?: unknown;
+    src?: unknown;
+    position?: unknown;
+    size?: unknown;
+  };
+
+  return (
+    typeof image.id === "string" &&
+    typeof image.name === "string" &&
+    typeof image.src === "string" &&
+    isPoint(image.position) &&
+    isSize(image.size)
+  );
+}
+
+function isPoint(value: unknown): value is { x: number; y: number } {
+  if (!value || typeof value !== "object") return false;
+  const point = value as { x?: unknown; y?: unknown };
+  return typeof point.x === "number" && typeof point.y === "number";
+}
+
+function isSize(value: unknown): value is { width: number; height: number } {
+  if (!value || typeof value !== "object") return false;
+  const size = value as { width?: unknown; height?: unknown };
+  return typeof size.width === "number" && typeof size.height === "number";
 }
 
 function readFileAsDataUrl(file: File) {
