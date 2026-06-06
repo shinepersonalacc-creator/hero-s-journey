@@ -6,6 +6,7 @@ import {
   getDisplayNameFromMetadata,
   hasCompletedOnboardingFromMetadata,
   loadUserXP,
+  saveUserXP,
 } from "@/services/supabase/profile";
 import { supabase } from "@/services/supabase/supabase";
 import { GoalSetup } from "@/features/onboarding/GoalSetup";
@@ -37,6 +38,7 @@ function Index() {
   const [signedIn, setSignedIn] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [profile, setProfile] = useState<{ gender?: string | null } | null>(null);
+  const [cloudXP, setCloudXP] = useState<{ xp: number; level: number } | null>(null);
   const [cloudOnboardingComplete, setCloudOnboardingComplete] = useState(false);
   const [checkingProfile, setCheckingProfile] = useState(false);
   const [profileChecked, setProfileChecked] = useState(false);
@@ -78,6 +80,7 @@ function Index() {
         user ? hasCompletedOnboardingFromMetadata(user.user_metadata) : false,
       );
       setProfile(profile);
+      setCloudXP(cloudXP);
 
       if (cloudXP) {
         setState((current) => ({
@@ -129,6 +132,24 @@ function Index() {
       subscription.unsubscribe();
     };
   }, [hydrated, profileChecked, setState]);
+
+  useEffect(() => {
+    if (!signedIn || !profileChecked || !cloudXP) return;
+    if (state.totalPoints <= cloudXP.xp) return;
+
+    const save = async () => {
+      try {
+        const saved = await saveUserXP(state.totalPoints);
+        if (saved) {
+          setCloudXP(saved);
+        }
+      } catch (error) {
+        console.error("Could not save XP to cloud profile:", error);
+      }
+    };
+
+    void save();
+  }, [signedIn, profileChecked, cloudXP, state.totalPoints]);
 
   const localHasStartedJourney = Boolean(
     state.hasStartedJourney || state.goal || state.draftGoal || state.categories.length,

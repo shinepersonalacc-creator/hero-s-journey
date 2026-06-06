@@ -1,4 +1,5 @@
 import { supabase } from "@/services/supabase/supabase";
+import { levelInfo } from "@/services/storage/storage";
 
 type Profile = {
   id: string;
@@ -239,15 +240,47 @@ export async function savePreferredDisplayName(name: string) {
 }
 
 export async function saveUserXP(xp: number) {
-  if (import.meta.env.DEV) {
-    console.warn("Ignoring client-controlled XP write.", { requestedXP: xp });
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError) {
+    console.error("Unable to verify auth user:", userError.message);
+    return null;
   }
-  return loadUserProfile();
+
+  if (!user) {
+    return null;
+  }
+
+  const level = levelInfo(xp).level;
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .upsert(
+      {
+        id: user.id,
+        xp,
+        level,
+      },
+      { onConflict: "id" },
+    )
+    .select("xp, level")
+    .single<{ xp: number; level: number }>();
+
+  if (error) {
+    console.error("Could not save XP to profile:", error.message);
+    return null;
+  }
+
+  return profile;
 }
 
 export async function addUserXP(amount: number) {
-  if (import.meta.env.DEV) {
-    console.warn("Ignoring client-controlled XP award.", { requestedAmount: amount });
+  const current = await loadUserXP();
+  if (!current) {
+    return null;
   }
-  return loadUserProfile();
+
+  return saveUserXP(current.xp + amount);
 }
