@@ -39,6 +39,7 @@ function Index() {
   const [profile, setProfile] = useState<{ gender?: string | null } | null>(null);
   const [cloudOnboardingComplete, setCloudOnboardingComplete] = useState(false);
   const [checkingProfile, setCheckingProfile] = useState(false);
+  const [profileChecked, setProfileChecked] = useState(false);
   const router = useRouter();
   const postSignInStorageKey = "ascend.postSignInSessionId";
 
@@ -52,13 +53,13 @@ function Index() {
     router.navigate({ to: "/session/$sessionId", params: { sessionId: redirectSessionId } });
   }, [router]);
 
-  const syncCloudXP = async () => {
+  const syncCloudXP = async (blocking = false) => {
     let cancelled = false;
 
-    setCheckingProfile(true);
+    if (blocking) setCheckingProfile(true);
 
     const timeout = setTimeout(() => {
-      if (!cancelled) setCheckingProfile(false);
+      if (!cancelled && blocking) setCheckingProfile(false);
     }, 5000);
 
     try {
@@ -91,7 +92,8 @@ function Index() {
     } finally {
       clearTimeout(timeout);
       if (!cancelled) {
-        setCheckingProfile(false);
+        if (blocking) setCheckingProfile(false);
+        setProfileChecked(true);
       }
     }
   };
@@ -99,29 +101,29 @@ function Index() {
   useEffect(() => {
     if (!hydrated) return;
 
-    syncCloudXP();
+    syncCloudXP(!profileChecked);
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      // Just update sign-in state; the syncCloudXP effect will re-run
-      // via the hydrated dependency when the session changes.
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "INITIAL_SESSION") return;
+
       if (!session) {
         setSignedIn(false);
         setDisplayName("");
         setCloudOnboardingComplete(false);
         setProfile(null);
         setCheckingProfile(false);
+        setProfileChecked(true);
       } else {
-        // Trigger a fresh sync by re-running syncCloudXP directly
-        syncCloudXP();
+        syncCloudXP(false);
       }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [hydrated, setState]);
+  }, [hydrated, profileChecked, setState]);
 
   const localHasStartedJourney = Boolean(
     state.hasStartedJourney || state.goal || state.draftGoal || state.categories.length,
@@ -156,7 +158,7 @@ function Index() {
     }));
   }, [setState, shouldResumeDashboard, state.draftGoal]);
 
-if (!hydrated || checkingProfile) return (
+if (!hydrated || (checkingProfile && !profileChecked)) return (
   <div className="min-h-screen flex items-center justify-center bg-white">
     <div className="text-2xl font-black animate-pulse">Loading your journey...</div>
   </div>
