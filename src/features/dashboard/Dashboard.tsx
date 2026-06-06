@@ -810,16 +810,18 @@ function CustomWorkspaceImageObject({
   return (
     <Draggable
       nodeRef={nodeRef}
-      defaultPosition={image.position}
+      position={image.position}
       onStop={(_, data) => onMove({ x: data.x, y: data.y })}
       cancel="button"
+      handle=".drag-handle"
     >
       <div
         ref={nodeRef}
         className="group absolute left-0 top-0 z-0 min-h-[80px] min-w-[80px] cursor-grab touch-none select-none resize overflow-hidden rounded-2xl border border-black/20 bg-white p-3 shadow-sm will-change-transform hover:shadow-md hover:border-black/40 active:cursor-grabbing transition-all"
         style={{ width: image.size.width, height: image.size.height }}
       >
-        <div className="h-full w-full flex flex-col">
+        <div className="drag-handle absolute top-0 left-0 right-0 h-6 cursor-move bg-black/10 rounded-t-2xl" />
+        <div className="h-full w-full flex flex-col pt-6">
           <div className="flex-1 overflow-hidden flex items-center justify-center bg-black/5 rounded-lg">
             <img
               src={image.src}
