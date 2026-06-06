@@ -1,6 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type RefObject,
+} from "react";
 import Draggable from "react-draggable";
-import { Camera, CameraOff, Check, Grip, ImagePlus, Maximize2, Pencil, Video, VideoOff, X } from "lucide-react";
+import { Camera, CameraOff, Check, Eraser, Grip, ImagePlus, Maximize2, Pencil, Video, VideoOff, X } from "lucide-react";
 import { supabase } from "@/services/supabase/supabase";
 import { Category, levelInfo, uid } from "@/services/storage/storage";
 import { SignalSchema, type SignalMessage } from "./signalSchema";
@@ -238,6 +245,7 @@ export function SessionRoomBoard({ sessionId, categories, localXP, hostUserId }:
   const [customImages, setCustomImages] = useState<CustomImageAsset[]>([]);
   const [customImageError, setCustomImageError] = useState("");
   const [customOnlyMode, setCustomOnlyMode] = useState(false);
+  const [customBackgroundProcessingId, setCustomBackgroundProcessingId] = useState<string | null>(null);
 
   const selectedCategory = useMemo(
     () =>
@@ -795,6 +803,29 @@ return () => {
     }
   };
 
+  const removeCustomImageBackground = async (imageId: string) => {
+    const image = customImagesRef.current.find((item) => item.id === imageId);
+    if (!image) return;
+
+    setCustomImageError("");
+    setCustomBackgroundProcessingId(imageId);
+
+    try {
+      const src = await removeBackgroundFromImage(image.src);
+      const nextImage = { ...image, src };
+      updateCustomImages(
+        (current) => current.map((item) => (item.id === imageId ? nextImage : item)),
+        { action: "add", images: [nextImage] },
+      );
+    } catch (error) {
+      setCustomImageError(
+        error instanceof Error ? error.message : "Could not remove the background.",
+      );
+    } finally {
+      setCustomBackgroundProcessingId(null);
+    }
+  };
+
   const displayedParticipants = participants.filter((participant) => participant.category);
 
   if (customOnlyMode) {
@@ -940,6 +971,8 @@ return () => {
                 { action: "remove", id: image.id },
               );
             }}
+            onRemoveBackground={() => void removeCustomImageBackground(image.id)}
+            removingBackground={customBackgroundProcessingId === image.id}
           />
         ))}
         {displayedParticipants.map((participant, index) => (
@@ -1008,14 +1041,19 @@ function CustomSessionImageObject({
   onMove,
   onResize,
   onRemove,
+  onRemoveBackground,
+  removingBackground,
 }: {
   image: CustomImageAsset;
   onMove: (position: { x: number; y: number }) => void;
   onResize: (size: { width: number; height: number }) => void;
   onRemove: () => void;
+  onRemoveBackground: () => void;
+  removingBackground: boolean;
 }) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const lastSizeRef = useRef(image.size);
+  const [selected, setSelected] = useState(false);
 
   useEffect(() => {
     const node = nodeRef.current;
@@ -1040,6 +1078,35 @@ function CustomSessionImageObject({
     lastSizeRef.current = image.size;
   }, [image.size]);
 
+  const startResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setSelected(true);
+
+    const node = nodeRef.current;
+    if (!node) return;
+
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startWidth = node.offsetWidth;
+    const startHeight = node.offsetHeight;
+
+    const resize = (resizeEvent: PointerEvent) => {
+      const width = Math.max(80, Math.round(startWidth + resizeEvent.clientX - startX));
+      const height = Math.max(80, Math.round(startHeight + resizeEvent.clientY - startY));
+      lastSizeRef.current = { width, height };
+      onResize({ width, height });
+    };
+
+    const stopResize = () => {
+      window.removeEventListener("pointermove", resize);
+      window.removeEventListener("pointerup", stopResize);
+    };
+
+    window.addEventListener("pointermove", resize);
+    window.addEventListener("pointerup", stopResize);
+  };
+
   return (
     <Draggable
       nodeRef={nodeRef}
@@ -1049,26 +1116,153 @@ function CustomSessionImageObject({
     >
       <div
         ref={nodeRef}
-        className="group absolute left-0 top-0 z-10 min-h-[80px] min-w-[80px] cursor-grab touch-none select-none resize overflow-hidden outline outline-2 outline-transparent will-change-transform hover:outline-black active:cursor-grabbing"
+        tabIndex={0}
+        onPointerDown={() => setSelected(true)}
+        onFocus={() => setSelected(true)}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setSelected(false);
+        }}
+        className={`group absolute left-0 top-0 min-h-[80px] min-w-[80px] cursor-grab touch-none select-none overflow-visible outline outline-2 will-change-transform active:cursor-grabbing ${
+          selected ? "z-30 outline-black" : "z-10 outline-transparent hover:outline-black"
+        }`}
         style={{ width: image.size.width, height: image.size.height }}
       >
-        <img
-          src={image.src}
-          alt={image.name}
-          className="pointer-events-none h-full w-full select-none object-contain"
-          draggable={false}
-        />
+        <div className="h-full w-full overflow-hidden">
+          <img
+            src={image.src}
+            alt={image.name}
+            className="pointer-events-none h-full w-full select-none object-contain"
+            draggable={false}
+          />
+        </div>
+        <div
+          className={`absolute right-1 top-1 gap-1 ${selected ? "flex" : "hidden group-hover:flex"}`}
+        >
+          <button
+            type="button"
+            onClick={onRemoveBackground}
+            disabled={removingBackground}
+            className="flex size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+            aria-label={`Remove background from ${image.name}`}
+            title="Remove background"
+          >
+            <Eraser className="size-4" strokeWidth={3} />
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="flex size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md"
+            aria-label={`Remove ${image.name}`}
+            title="Remove image"
+          >
+            <X className="size-4" strokeWidth={4} />
+          </button>
+        </div>
         <button
           type="button"
-          onClick={onRemove}
-          className="absolute right-1 top-1 hidden size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md group-hover:flex"
-          aria-label={`Remove ${image.name}`}
-          title="Remove image"
+          onPointerDown={startResize}
+          className={`absolute bottom-1 right-1 size-8 cursor-se-resize items-center justify-center border-2 border-black bg-white text-black shadow-md ${
+            selected ? "flex" : "hidden group-hover:flex"
+          }`}
+          aria-label={`Resize ${image.name}`}
+          title="Resize image"
         >
-          <X className="size-4" strokeWidth={4} />
+          <Maximize2 className="size-4" strokeWidth={3} />
         </button>
+        {removingBackground && (
+          <div className="absolute inset-x-2 bottom-10 bg-white px-2 py-1 text-center text-xs font-bold text-black shadow-md">
+            Removing bg...
+          </div>
+        )}
       </div>
     </Draggable>
+  );
+}
+
+function loadImage(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Could not process that image."));
+    image.src = src;
+  });
+}
+
+async function removeBackgroundFromImage(src: string) {
+  const image = await loadImage(src);
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) throw new Error("Background removal is not available in this browser.");
+
+  canvas.width = image.naturalWidth;
+  canvas.height = image.naturalHeight;
+  context.drawImage(image, 0, 0);
+
+  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  const background = sampleCornerColor(data, canvas.width, canvas.height);
+  const tolerance = 72;
+  const softEdge = 28;
+
+  for (let index = 0; index < data.length; index += 4) {
+    const distance = colorDistance(
+      data[index],
+      data[index + 1],
+      data[index + 2],
+      background.r,
+      background.g,
+      background.b,
+    );
+
+    if (distance <= tolerance) {
+      data[index + 3] = 0;
+    } else if (distance <= tolerance + softEdge) {
+      const alphaRatio = (distance - tolerance) / softEdge;
+      data[index + 3] = Math.round(data[index + 3] * alphaRatio);
+    }
+  }
+
+  context.putImageData(imageData, 0, 0);
+  return canvas.toDataURL("image/png");
+}
+
+function sampleCornerColor(data: Uint8ClampedArray, width: number, height: number) {
+  const points = [
+    { x: 0, y: 0 },
+    { x: width - 1, y: 0 },
+    { x: 0, y: height - 1 },
+    { x: width - 1, y: height - 1 },
+  ];
+
+  const totals = points.reduce(
+    (acc, point) => {
+      const index = (point.y * width + point.x) * 4;
+      return {
+        r: acc.r + data[index],
+        g: acc.g + data[index + 1],
+        b: acc.b + data[index + 2],
+      };
+    },
+    { r: 0, g: 0, b: 0 },
+  );
+
+  return {
+    r: totals.r / points.length,
+    g: totals.g / points.length,
+    b: totals.b / points.length,
+  };
+}
+
+function colorDistance(
+  redA: number,
+  greenA: number,
+  blueA: number,
+  redB: number,
+  greenB: number,
+  blueB: number,
+) {
+  return Math.sqrt(
+    (redA - redB) ** 2 + (greenA - greenB) ** 2 + (blueA - blueB) ** 2,
   );
 }
 
