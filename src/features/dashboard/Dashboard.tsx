@@ -22,6 +22,7 @@ import {
   Home,
   ImagePlus,
   Link,
+  Maximize2,
   Pencil,
   Plus,
   RotateCcw,
@@ -817,7 +818,7 @@ function CustomWorkspaceImageObject({
     >
       <div
         ref={nodeRef}
-        className="group absolute left-0 top-0 z-10 min-h-[80px] min-w-[80px] cursor-grab touch-none select-none resize overflow-hidden outline outline-2 outline-transparent will-change-transform hover:outline-black active:cursor-grabbing"
+        className="group absolute left-0 top-0 z-10 min-h-[96px] min-w-[96px] cursor-grab touch-none select-none resize overflow-hidden outline outline-2 outline-black/35 will-change-transform hover:outline-black active:cursor-grabbing"
         style={{ width: image.size.width, height: image.size.height }}
       >
         <img
@@ -826,12 +827,12 @@ function CustomWorkspaceImageObject({
           className="pointer-events-none h-full w-full select-none object-contain"
           draggable={false}
         />
-        <div className="absolute right-1 top-1 hidden gap-1 group-hover:flex">
+        <div className="absolute right-1 top-1 flex gap-1">
           <button
             type="button"
             onClick={onRemoveBackground}
             disabled={removingBackground}
-            className="flex size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex size-9 items-center justify-center border-2 border-black bg-white text-black shadow-md disabled:cursor-not-allowed disabled:opacity-60 hover:bg-black/5"
             aria-label={`Remove background from ${image.name}`}
             title="Remove background"
           >
@@ -840,12 +841,18 @@ function CustomWorkspaceImageObject({
           <button
             type="button"
             onClick={onRemove}
-            className="flex size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md"
+            className="flex size-9 items-center justify-center border-2 border-black bg-white text-black shadow-md hover:bg-red-50"
             aria-label={`Remove ${image.name}`}
             title="Remove image"
           >
             <X className="size-4" strokeWidth={4} />
           </button>
+        </div>
+        <div
+          className="pointer-events-none absolute bottom-1 right-1 flex size-8 items-center justify-center border-2 border-black bg-white text-black shadow-md"
+          title="Drag the corner to resize"
+        >
+          <Maximize2 className="size-4" strokeWidth={3} />
         </div>
         {removingBackground && (
           <div className="absolute inset-x-2 bottom-2 bg-white px-2 py-1 text-center text-xs font-bold text-black shadow-md">

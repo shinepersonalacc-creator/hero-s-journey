@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import Draggable from "react-draggable";
-import { Camera, CameraOff, Check, Grip, ImagePlus, Maximize2, Video, VideoOff, X } from "lucide-react";
+import { Camera, CameraOff, Check, Grip, ImagePlus, Maximize2, Pencil, Video, VideoOff, X } from "lucide-react";
 import { supabase } from "@/services/supabase/supabase";
 import { Category, levelInfo, uid } from "@/services/storage/storage";
 import { SignalSchema, type SignalMessage } from "./signalSchema";
 
 const cameraOffPlaceholder = "/Image/camera-off-placeholder.svg";
+const sessionDisplayNameStorageKey = "ascend.session.displayName";
 
 type Props = {
   sessionId: string;
@@ -78,6 +79,26 @@ function getParticipantId() {
   const id = uid();
   sessionStorage.setItem(participantStorageKey, id);
   return id;
+}
+
+function getStoredSessionDisplayName() {
+  if (typeof window === "undefined") return "";
+
+  try {
+    return window.localStorage.getItem(sessionDisplayNameStorageKey)?.trim() ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function storeSessionDisplayName(name: string) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(sessionDisplayNameStorageKey, name);
+  } catch {
+    // The name still works for this session even if local persistence is unavailable.
+  }
 }
 
 function toSharedCategory(category?: Category | null): SharedCategory | null {
@@ -209,6 +230,7 @@ export function SessionRoomBoard({ sessionId, categories, localXP, hostUserId }:
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [displayName, setDisplayName] = useState("Session guest");
+  const [displayNameDraft, setDisplayNameDraft] = useState("Session guest");
   const [userId, setUserId] = useState<string | null>(null);
   const [cardPositions, setCardPositions] = useState<Record<string, { x: number; y: number }>>({});
   const customImageInputRef = useRef<HTMLInputElement>(null);
@@ -310,11 +332,20 @@ export function SessionRoomBoard({ sessionId, categories, localXP, hostUserId }:
         data.user?.user_metadata?.name ||
         data.user?.email?.split("@")[0] ||
         "Session guest";
+      const nextName = getStoredSessionDisplayName() || userName;
 
-      setDisplayName(userName);
+      setDisplayName(nextName);
+      setDisplayNameDraft(nextName);
       setUserId(data.user?.id ?? null);
     });
   }, []);
+
+  const saveDisplayName = () => {
+    const nextName = displayNameDraft.trim() || "Session guest";
+    setDisplayName(nextName);
+    setDisplayNameDraft(nextName);
+    storeSessionDisplayName(nextName);
+  };
 
   const broadcastSignal = (message: Omit<SignalMessage, "from">) => {
     void channelRef.current?.send({
@@ -804,6 +835,35 @@ return () => {
   return (
     <div className="relative isolate mt-8">
       <div className="relative z-30 flex flex-wrap items-center gap-3 rounded-2xl border-2 border-black bg-white p-4 text-black shadow-xl">
+        <label className="flex min-w-[220px] flex-1 flex-col gap-1 font-bold">
+          <span className="text-xs uppercase tracking-[0.2em] text-black/60">
+            Display name
+          </span>
+          <div className="flex gap-2">
+            <input
+              value={displayNameDraft}
+              onChange={(event) => setDisplayNameDraft(event.target.value)}
+              onBlur={saveDisplayName}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.currentTarget.blur();
+                  saveDisplayName();
+                }
+              }}
+              className="h-11 min-w-0 flex-1 rounded-xl border-2 border-black bg-white px-3 text-base font-semibold"
+              aria-label="Edit display name"
+            />
+            <button
+              type="button"
+              onClick={saveDisplayName}
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-white text-black hover:bg-black/5"
+              aria-label="Save display name"
+              title="Save display name"
+            >
+              <Pencil className="size-4" />
+            </button>
+          </div>
+        </label>
         <label className="flex min-w-[220px] flex-1 flex-col gap-1 font-bold">
           <span className="text-xs uppercase tracking-[0.2em] text-black/60">
             Category shown to group
