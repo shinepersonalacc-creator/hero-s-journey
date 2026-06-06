@@ -256,7 +256,7 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
           id: uid(),
           name: file.name,
           src: await readFileAsDataUrl(file),
-          position: { x: 32 + index * 28, y: 130 + index * 28 },
+          position: { x: index * 28, y: index * 28 },
           size: { width: 280, height: 220 },
         })),
       );
@@ -578,7 +578,7 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
             </div>
           )}
 
-          <div className="relative z-20 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <div className="relative z-20 grid grid-cols-1 items-start gap-5 md:grid-cols-2 xl:grid-cols-3">
             {visibleCategories.map((c, index) => (
               <div
                 key={c.id}
@@ -594,43 +594,33 @@ export function Dashboard({ state, setState, displayName = "" }: Props) {
                 />
               </div>
             ))}
-          </div>
-
-          {customImages.length > 0 && (
-            <div className="mt-12">
-              {!visibilityFocusMode && (
-                <div
-                  className="level-fall-item mb-5 flex items-baseline justify-between"
-                  style={{ animationDelay: "1250ms" }}
-                >
-                  <h2 className="font-display text-2xl font-semibold">Custom Images</h2>
-                </div>
-              )}
-              <div className="relative z-0 min-h-[240px] overflow-visible">
-                {customImages.map((image) => (
-                  <CustomWorkspaceImageObject
-                    key={`${image.id}-${image.position.x}-${image.position.y}`}
-                    image={image}
-                    onMove={(position) => {
-                      setCustomImages((current) =>
-                        current.map((item) => (item.id === image.id ? { ...item, position } : item)),
-                      );
-                    }}
-                    onResize={(size) => {
-                      setCustomImages((current) =>
-                        current.map((item) => (item.id === image.id ? { ...item, size } : item)),
-                      );
-                    }}
-                    onRemove={() => {
-                      setCustomImages((current) => current.filter((item) => item.id !== image.id));
-                    }}
-                    onRemoveBackground={() => void removeCustomImageBackground(image.id)}
-                    removingBackground={customBackgroundProcessingId === image.id}
-                  />
-                ))}
+            {customImages.map((image, index) => (
+              <div
+                key={image.id}
+                className="level-fall-item"
+                style={{ animationDelay: `${1450 + (visibleCategories.length + index) * 220}ms` }}
+              >
+                <CustomWorkspaceImageObject
+                  image={image}
+                  onMove={(position) => {
+                    setCustomImages((current) =>
+                      current.map((item) => (item.id === image.id ? { ...item, position } : item)),
+                    );
+                  }}
+                  onResize={(size) => {
+                    setCustomImages((current) =>
+                      current.map((item) => (item.id === image.id ? { ...item, size } : item)),
+                    );
+                  }}
+                  onRemove={() => {
+                    setCustomImages((current) => current.filter((item) => item.id !== image.id));
+                  }}
+                  onRemoveBackground={() => void removeCustomImageBackground(image.id)}
+                  removingBackground={customBackgroundProcessingId === image.id}
+                />
               </div>
-            </div>
-          )}
+            ))}
+          </div>
         </section>
 
       </div>
@@ -817,7 +807,7 @@ function CustomWorkspaceImageObject({
     >
       <div
         ref={nodeRef}
-        className="group absolute left-0 top-0 z-0 min-h-[80px] min-w-[80px] cursor-grab touch-none select-none resize overflow-hidden rounded-2xl border border-black/20 bg-white p-3 shadow-sm will-change-transform hover:shadow-md hover:border-black/40 active:cursor-grabbing transition-all"
+        className="group relative min-h-[80px] min-w-[80px] max-w-full cursor-grab touch-none select-none resize overflow-hidden rounded-2xl border border-black/20 bg-white p-3 shadow-sm transition-all will-change-transform hover:border-black/40 hover:shadow-md active:cursor-grabbing"
         style={{ width: image.size.width, height: image.size.height }}
       >
         <div className="drag-handle absolute top-0 left-0 right-0 h-6 cursor-move bg-black/10 rounded-t-2xl" />
